@@ -30,11 +30,11 @@ import org.neo4j.graphalgo.core.utils.TerminationFlag;
 import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
 import org.neo4j.graphalgo.core.write.Exporter;
 import org.neo4j.graphalgo.impl.MSTPrim;
-import org.neo4j.graphdb.Direction;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.kernel.api.DataWriteOperations;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.exceptions.KernelException;
+import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.*;
@@ -106,9 +106,10 @@ public class MSTPrimProc {
                 Exporter.of(graph, api)
                         .withLog(log)
                         .build()
-                        .writeRelationships(
+                        .writeRelationshipAndProperty(
                                 configuration.get(CONFIG_WRITE_RELATIONSHIP, CONFIG_WRITE_RELATIONSHIP_DEFAULT),
-                                (ops, typeId) -> minimumSpanningTree.forEachBFS(root, writeBack((int) typeId, graph, ops))
+                                weightProperty,
+                                (ops, relType, propertyType) -> minimumSpanningTree.forEachBFS(root, writeBack(relType, propertyType, graph, ops))
                         );
             });
         }
@@ -116,14 +117,15 @@ public class MSTPrimProc {
         return Stream.of(builder.build());
     }
 
-    private static RelationshipConsumer writeBack(int typeId, Graph mapping, DataWriteOperations ops) {
+    private static RelationshipConsumer writeBack(int relType, int propertyType, Graph graph, DataWriteOperations ops) {
         return (source, target, rid) -> {
             try {
-                ops.relationshipCreate(
-                        typeId,
-                        mapping.toOriginalNodeId(source),
-                        mapping.toOriginalNodeId(target)
+                final long relId = ops.relationshipCreate(
+                        relType,
+                        graph.toOriginalNodeId(source),
+                        graph.toOriginalNodeId(target)
                 );
+                ops.relationshipSetProperty(relId, DefinedProperty.doubleProperty(propertyType, graph.weightOf(source, target)));
             } catch (KernelException e) {
                 throw Exceptions.launderedException(e);
             }

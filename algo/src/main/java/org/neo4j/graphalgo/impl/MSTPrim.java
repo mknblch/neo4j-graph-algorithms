@@ -49,6 +49,9 @@ public class MSTPrim extends Algorithm<MSTPrim> {
     private UndirectedTree minimumSpanningTree;
 
     private double sumW;
+    private double minW;
+    private double maxW;
+
     private int effectiveNodeCount;
 
     public MSTPrim(Graph graph) {
@@ -61,6 +64,8 @@ public class MSTPrim extends Algorithm<MSTPrim> {
      */
     public MSTPrim compute(int startNode) {
         this.sumW = 0.0;
+        this.maxW = 0.0;
+        this.minW = Double.MAX_VALUE;
         this.effectiveNodeCount = 1;
         final ProgressLogger logger = getProgressLogger();
         final LongMinPriorityQueue queue = new LongMinPriorityQueue();
@@ -83,7 +88,10 @@ public class MSTPrim extends Algorithm<MSTPrim> {
             visited.put(tailId);
             final int headId = getHead(transition);
             minimumSpanningTree.addRelationship(headId, tailId);
-            sumW += graph.weightOf(headId, tailId);
+            final double w = graph.weightOf(headId, tailId);
+            this.sumW += w;
+            this.minW = Math.min(minW, w);
+            this.maxW = Math.max(maxW, w);
             effectiveNodeCount++;
             // add new candidates
             graph.forEachRelationship(tailId, Direction.OUTGOING, (s, t, r) -> {
@@ -124,29 +132,44 @@ public class MSTPrim extends Algorithm<MSTPrim> {
         public final long computeMillis;
         public final long writeMillis;
         public final double weightSum;
+        public final double weightMin;
+        public final double weightMax;
         public final long effectiveNodeCount;
 
         public Result(long loadMillis,
-                             long computeMillis,
-                             long writeMillis,
-                             double weightSum,
-                             int effectiveNodeCount) {
+                      long computeMillis,
+                      long writeMillis,
+                      double weightSum,
+                      double weightMin, double weightMax, int effectiveNodeCount) {
             this.loadMillis = loadMillis;
             this.computeMillis = computeMillis;
             this.writeMillis = writeMillis;
             this.weightSum = weightSum;
+            this.weightMin = weightMin;
+            this.weightMax = weightMax;
             this.effectiveNodeCount = effectiveNodeCount;
         }
-
     }
 
     public static class Builder extends AbstractResultBuilder<Result> {
 
         protected double weightSum = 0.0;
+        protected double weightMin = 0.0;
+        protected double weightMax = 0.0;
         protected int effectiveNodeCount = 0;
 
         public Builder withWeightSum(double weightSum) {
             this.weightSum = weightSum;
+            return this;
+        }
+
+        public Builder withWeightMin(double weightMin) {
+            this.weightMin = weightMin;
+            return this;
+        }
+
+        public Builder withWeightMax(double weightMax) {
+            this.weightMax = weightMax;
             return this;
         }
 
@@ -160,7 +183,7 @@ public class MSTPrim extends Algorithm<MSTPrim> {
                     evalDuration,
                     writeDuration,
                     weightSum,
-                    effectiveNodeCount);
+                    weightMin, weightMax, effectiveNodeCount);
         }
     }
 
