@@ -18,10 +18,13 @@
  */
 package org.neo4j.graphalgo.impl;
 
-import com.carrotsearch.hppc.*;
 import org.neo4j.graphalgo.api.*;
+import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
 import org.neo4j.graphalgo.core.utils.queue.LongMinPriorityQueue;
+import org.neo4j.graphalgo.core.utils.traverse.SimpleBitSet;
+import org.neo4j.graphalgo.results.AbstractResultBuilder;
+import org.neo4j.graphdb.Direction;
 
 import static org.neo4j.graphalgo.core.utils.RawValues.*;
 
@@ -40,54 +43,59 @@ import static org.neo4j.graphalgo.core.utils.RawValues.*;
  */
 public class MSTPrim extends Algorithm<MSTPrim> {
 
-    private IdMapping idMapping;
-    private BothRelationshipIterator iterator;
-    private RelationshipWeights weights;
-    private MinimumSpanningTree minimumSpanningTree;
+    private final Graph graph;
+    private final int nodeCount;
 
-    public MSTPrim(IdMapping idMapping, BothRelationshipIterator iterator, RelationshipWeights weights) {
-        this.idMapping = idMapping;
-        this.iterator = iterator;
-        this.weights = weights;
+    private UndirectedTree minimumSpanningTree;
+
+    private double sumW;
+    private int effectiveNodeCount;
+
+    public MSTPrim(Graph graph) {
+        this.graph = graph;
+        nodeCount = Math.toIntExact(graph.nodeCount());
     }
 
     /**
      * compute the minimum weight spanning tree starting at node startNode
-     *
-     * @param startNode the node to start the evaluation from
-     * @return a container of the transitions in the minimum spanning tree
      */
     public MSTPrim compute(int startNode) {
+        this.sumW = 0.0;
+        this.effectiveNodeCount = 1;
+        final ProgressLogger logger = getProgressLogger();
         final LongMinPriorityQueue queue = new LongMinPriorityQueue();
-        final int nodeCount = Math.toIntExact(idMapping.nodeCount());
-        final BitSet visited = new BitSet(nodeCount);
-        minimumSpanningTree = new MinimumSpanningTree(nodeCount, startNode, weights);
+        final SimpleBitSet visited = new SimpleBitSet(nodeCount);
+        minimumSpanningTree = new UndirectedTree(nodeCount);
         // initially add all relations from startNode to the priority queue
-        visited.set(startNode);
-        iterator.forEachRelationship(startNode, (sourceNodeId, targetNodeId, relationId) -> {
-            queue.add(combineIntInt(startNode, targetNodeId), weights.weightOf(sourceNodeId, targetNodeId));
+        visited.put(startNode);
+        graph.forEachRelationship(startNode, Direction.OUTGOING, (s, t, r) -> {
+            // encode relationship as long
+            queue.add(combineIntInt(s, t), graph.weightOf(s, t));
             return true;
         });
         while (!queue.isEmpty() && running()) {
             // retrieve cheapest transition
             final long transition = queue.pop();
-            final int nodeId = getTail(transition);
-            if (visited.get(nodeId)) {
+            final int tailId = getTail(transition);
+            if (visited.contains(tailId)) {
                 continue;
             }
-            visited.set(nodeId);
-            // add to mst
-            minimumSpanningTree.addRelationship(getHead(transition), nodeId);
+            visited.put(tailId);
+            final int headId = getHead(transition);
+            minimumSpanningTree.addRelationship(headId, tailId);
+            sumW += graph.weightOf(headId, tailId);
+            effectiveNodeCount++;
             // add new candidates
-            iterator.forEachRelationship(nodeId, (sourceNodeId, targetNodeId, relationId) -> {
-                queue.add(combineIntInt(nodeId, targetNodeId), weights.weightOf(sourceNodeId, targetNodeId));
+            graph.forEachRelationship(tailId, Direction.OUTGOING, (s, t, r) -> {
+                queue.add(combineIntInt(s, t), graph.weightOf(s, t));
                 return true;
             });
+            logger.logProgress(nodeCount - 1, effectiveNodeCount);
         }
         return this;
     }
 
-    public MinimumSpanningTree getMinimumSpanningTree() {
+    public UndirectedTree getMinimumSpanningTree() {
         return minimumSpanningTree;
     }
 
@@ -98,90 +106,62 @@ public class MSTPrim extends Algorithm<MSTPrim> {
 
     @Override
     public MSTPrim release() {
-        idMapping = null;
-        iterator = null;
-        weights = null;
         minimumSpanningTree = null;
         return null;
     }
 
-    public static class MinimumSpanningTree extends UndirectedTree {
+    public double getSumW() {
+        return sumW;
+    }
 
-        private final int startNodeId;
-        private final RelationshipWeights weights;
+    public int getEffectiveNodeCount() {
+        return effectiveNodeCount;
+    }
 
-        /**
-         * Creates a new Tree that can hold up to {@code capacity} nodes.
-         *
-         * @param capacity
-         * @param weights
-         */
-        public MinimumSpanningTree(int capacity, int startNodeId, RelationshipWeights weights) {
-            super(capacity);
-            this.startNodeId = startNodeId;
-            this.weights = weights;
+    public static class Result {
+
+        public final long loadMillis;
+        public final long computeMillis;
+        public final long writeMillis;
+        public final double weightSum;
+        public final long effectiveNodeCount;
+
+        public Result(long loadMillis,
+                             long computeMillis,
+                             long writeMillis,
+                             double weightSum,
+                             int effectiveNodeCount) {
+            this.loadMillis = loadMillis;
+            this.computeMillis = computeMillis;
+            this.writeMillis = writeMillis;
+            this.weightSum = weightSum;
+            this.effectiveNodeCount = effectiveNodeCount;
         }
 
-        public int getStartNodeId() {
-            return startNodeId;
+    }
+
+    public static class Builder extends AbstractResultBuilder<Result> {
+
+        protected double weightSum = 0.0;
+        protected int effectiveNodeCount = 0;
+
+        public Builder withWeightSum(double weightSum) {
+            this.weightSum = weightSum;
+            return this;
         }
 
-        public void forEachBFS(RelationshipConsumer consumer) {
-            super.forEachBFS(startNodeId, consumer);
+        public Builder withEffectiveNodeCount(int effectiveNodeCount) {
+            this.effectiveNodeCount = effectiveNodeCount;
+            return this;
         }
 
-        public void forEachDFS(RelationshipConsumer consumer) {
-            super.forEachDFS(startNodeId, consumer);
-        }
-
-        public Aggregator aggregate() {
-            final Aggregator aggregator = new Aggregator(weights);
-            forEachBFS(aggregator);
-            return aggregator;
-        }
-
-        public static class Aggregator implements RelationshipConsumer {
-
-            private final RelationshipWeights relationshipWeights;
-            private double sum = 0.0;
-            private double min = Double.MAX_VALUE;
-            private double max = Double.MIN_VALUE;
-            private int count;
-
-
-            private Aggregator(RelationshipWeights relationshipWeights) {
-                this.relationshipWeights = relationshipWeights;
-            }
-
-            @Override
-            public boolean accept(int sourceNodeId, int targetNodeId, long relationId) {
-                double weight = relationshipWeights.weightOf(sourceNodeId, targetNodeId);
-                if (weight < min) {
-                    min = weight;
-                }
-                if (weight > max) {
-                    max = weight;
-                }
-                count++;
-                sum += weight;
-                return true;
-            }
-
-            public double getSum() {
-                return sum;
-            }
-
-            public double getMin() {
-                return min;
-            }
-
-            public double getMax() {
-                return max;
-            }
-
-            public int getCount() {
-                return count;
-            }
+        public Result build() {
+            return new Result(loadDuration,
+                    evalDuration,
+                    writeDuration,
+                    weightSum,
+                    effectiveNodeCount);
         }
     }
+
 }

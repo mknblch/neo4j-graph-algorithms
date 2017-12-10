@@ -63,6 +63,7 @@ public class MSTPrimProcIntegrationTest {
                 "CREATE(c:Node) " +
                 "CREATE(d:Node) " +
                 "CREATE(e:Node) " +
+                "CREATE(z:Node) " +
                 "CREATE (a)-[:TYPE {cost:1.0}]->(b) " +
                 "CREATE (a)-[:TYPE {cost:2.0}]->(c) " +
                 "CREATE (b)-[:TYPE {cost:3.0}]->(c) " +
@@ -85,24 +86,19 @@ public class MSTPrimProcIntegrationTest {
     @Test
     public void testMst() throws Exception {
 
-        db.execute("MATCH(n:Node{start:true}) WITH n CALL algo.mst(n, 'cost', {write:true, stats:true}) " +
-                "YIELD loadMillis, computeMillis, writeMillis, weightSum, weightMin, " +
-                "weightMax, relationshipCount RETURN loadMillis, computeMillis, " +
-                "writeMillis, weightSum, weightMin, weightMax, relationshipCount").accept(res -> {
+        db.execute("MATCH(n:Node{start:true}) WITH n CALL algo.mst('Node', 'TYPE', 'cost', id(n), {write:true, stats:true}) " +
+                "YIELD loadMillis, computeMillis, writeMillis, weightSum, effectiveNodeCount " +
+                "RETURN loadMillis, computeMillis, writeMillis, weightSum, effectiveNodeCount").accept(res -> {
 
             System.out.println(res.get("loadMillis"));
             System.out.println(res.get("computeMillis"));
             System.out.println(res.get("writeMillis"));
             System.out.println(res.get("weightSum"));
-            System.out.println(res.get("weightMin"));
-            System.out.println(res.get("weightMax"));
-            System.out.println(res.get("relationshipCount"));
+            System.out.println(res.get("effectiveNodeCount"));
 
             assertNotEquals(-1L, res.getNumber("writeMillis").longValue());
             assertEquals(12.0, res.getNumber("weightSum").doubleValue(), 0.01);
-            assertEquals(1.0, res.getNumber("weightMin").doubleValue(), 0.01);
-            assertEquals(5.0, res.getNumber("weightMax").doubleValue(), 0.01);
-            assertEquals(4, res.getNumber("relationshipCount").intValue());
+            assertEquals(5, res.getNumber("effectiveNodeCount").intValue());
 
             return true;
         });
