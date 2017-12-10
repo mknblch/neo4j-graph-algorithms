@@ -97,6 +97,8 @@ public class MSTPrimProc {
         });
 
         builder.withWeightSum(mstPrim.getSumW())
+                .withWeightMax(mstPrim.getMaxW())
+                .withWeightMin(mstPrim.getMinW())
                 .withEffectiveNodeCount(mstPrim.getEffectiveNodeCount());
 
         if (configuration.isWriteFlag()) {

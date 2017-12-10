@@ -126,6 +126,14 @@ public class MSTPrim extends Algorithm<MSTPrim> {
         return effectiveNodeCount;
     }
 
+    public double getMinW() {
+        return minW;
+    }
+
+    public double getMaxW() {
+        return maxW;
+    }
+
     public static class Result {
 
         public final long loadMillis;
