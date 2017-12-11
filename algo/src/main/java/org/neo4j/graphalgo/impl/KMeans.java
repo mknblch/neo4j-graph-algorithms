@@ -18,7 +18,7 @@
  */
 package org.neo4j.graphalgo.impl;
 
-import org.neo4j.graphalgo.api.*;
+import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
 import org.neo4j.graphalgo.core.utils.queue.LongMinPriorityQueue;
@@ -41,12 +41,13 @@ import static org.neo4j.graphalgo.core.utils.RawValues.*;
  *
  * @author mknblch
  */
-public class MSTPrim extends Algorithm<MSTPrim> {
+public class KMeans extends Algorithm<KMeans> {
 
     private final Graph graph;
     private final int nodeCount;
 
     private UndirectedTree minimumSpanningTree;
+    private final LongMin
 
     private double sumW;
     private double minW;
@@ -54,7 +55,7 @@ public class MSTPrim extends Algorithm<MSTPrim> {
 
     private int effectiveNodeCount;
 
-    public MSTPrim(Graph graph) {
+    public KMeans(Graph graph) {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
     }
@@ -62,7 +63,7 @@ public class MSTPrim extends Algorithm<MSTPrim> {
     /**
      * compute the minimum weight spanning tree starting at node startNode
      */
-    public MSTPrim compute(int startNode) {
+    public KMeans compute(int startNode) {
         this.sumW = 0.0;
         this.maxW = 0.0;
         this.minW = Double.MAX_VALUE;
@@ -103,17 +104,19 @@ public class MSTPrim extends Algorithm<MSTPrim> {
         return this;
     }
 
+
+
     public UndirectedTree getMinimumSpanningTree() {
         return minimumSpanningTree;
     }
 
     @Override
-    public MSTPrim me() {
+    public KMeans me() {
         return this;
     }
 
     @Override
-    public MSTPrim release() {
+    public KMeans release() {
         minimumSpanningTree = null;
         return null;
     }
