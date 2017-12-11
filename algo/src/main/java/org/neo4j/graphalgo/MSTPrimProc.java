@@ -27,6 +27,7 @@ import org.neo4j.graphalgo.core.utils.Pools;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.ProgressTimer;
 import org.neo4j.graphalgo.core.utils.TerminationFlag;
+import org.neo4j.graphalgo.core.write.Exporter;
 import org.neo4j.graphalgo.impl.Prim;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.kernel.api.DataWriteOperations;
@@ -91,28 +92,29 @@ public class MSTPrimProc {
                 .withTerminationFlag(TerminationFlag.wrap(transaction));
 
         builder.timeEval(() -> {
-            mstPrim.compute(root);
+            mstPrim.computeMinimumSpanningTree(root);
         });
 
-        builder.withWeightSum(mstPrim.getSumW())
-                .withWeightMax(mstPrim.getMaxW())
-                .withWeightMin(mstPrim.getMinW())
-                .withEffectiveNodeCount(mstPrim.getEffectiveNodeCount());
+        final Prim.SpanningTree spanningTree = mstPrim.getSpanningTree();
 
-//        if (configuration.isWriteFlag()) {
-//            final UndirectedTree minimumSpanningTree = mstPrim.getMinimumSpanningTree();
-//            mstPrim.release();
-//            builder.timeWrite(() -> {
-//                Exporter.of(graph, api)
-//                        .withLog(log)
-//                        .build()
-//                        .writeRelationshipAndProperty(
-//                                configuration.get(CONFIG_WRITE_RELATIONSHIP, CONFIG_WRITE_RELATIONSHIP_DEFAULT),
-//                                weightProperty,
-//                                (ops, relType, propertyType) -> minimumSpanningTree.forEachBFS(root, writeBack(relType, propertyType, graph, ops))
-//                        );
-//            });
-//        }
+        builder.withWeightSum(spanningTree.getSumW())
+                .withWeightMax(spanningTree.getMaxW())
+                .withWeightMin(spanningTree.getMinW())
+                .withEffectiveNodeCount(spanningTree.getEffectiveNodeCount());
+
+        if (configuration.isWriteFlag()) {
+            mstPrim.release();
+            builder.timeWrite(() -> {
+                Exporter.of(graph, api)
+                        .withLog(log)
+                        .build()
+                        .writeRelationshipAndProperty(
+                                configuration.get(CONFIG_WRITE_RELATIONSHIP, CONFIG_WRITE_RELATIONSHIP_DEFAULT),
+                                weightProperty,
+                                (ops, relType, propertyType) -> spanningTree.forEach(writeBack(relType, propertyType, graph, ops))
+                        );
+            });
+        }
 
         return Stream.of(builder.build());
     }

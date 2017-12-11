@@ -43,20 +43,20 @@ import static org.junit.Assert.assertTrue;
 /**
  * Tests if MSTPrim returns a valid MST for each node
  *
- *         a                a
- *     1 /   \ 2          /  \
- *      /     \          /    \
- *     b --3-- c        b      c
- *     |       |   =>   |      |
- *     4       5        |      |
- *     |       |        |      |
- *     d --6-- e        d      e
+ *         a                  a                  a
+ *     1 /   \ 2            /  \                  \
+ *      /     \            /    \                  \
+ *     b --3-- c          b      c          b       c
+ *     |       |  =min=>  |      |  =max=>  |       |
+ *     4       5          |      |          |       |
+ *     |       |          |      |          |       |
+ *     d --6-- e          d      e          d-------e
  *
  *
  * @author mknobloch
  */
 @RunWith(Parameterized.class)
-public class MSTPrimTest {
+public class PrimTest {
 
     private final Label label;
     private int a, b, c, d, e;
@@ -67,6 +67,7 @@ public class MSTPrimTest {
             "CREATE (c:Node {name:'c'})\n" +
             "CREATE (d:Node {name:'d'})\n" +
             "CREATE (e:Node {name:'e'})\n" +
+            "CREATE (f:Node {name:'f'})\n" +
             "CREATE" +
             " (a)-[:TYPE {cost:1.0}]->(b),\n" +
             " (a)-[:TYPE {cost:2.0}]->(c),\n" +
@@ -99,7 +100,7 @@ public class MSTPrimTest {
     }
 
 
-    public MSTPrimTest(
+    public PrimTest(
             Class<? extends GraphFactory> graphImpl,
             String nameIgnoredOnlyForTestName) {
 
@@ -124,41 +125,62 @@ public class MSTPrimTest {
     }
 
     @Test
-    public void testMstFromA() throws Exception {
-        verifyMst(new Prim(graph).compute(a).getParents());
+    public void testMaximumFromA() throws Exception {
+        assertMaximum(new Prim(graph).computeMaximumSpanningTree(a).getSpanningTree());
+    }
+    @Test
+    public void testMinimumFromA() throws Exception {
+        assertMinimum(new Prim(graph).computeMinimumSpanningTree(a).getSpanningTree());
     }
 
     @Test
-    public void testMstFromB() throws Exception {
-        verifyMst(new Prim(graph).compute(b).getParents());
+    public void testMinimumFromB() throws Exception {
+        assertMinimum(new Prim(graph).computeMinimumSpanningTree(b).getSpanningTree());
     }
 
     @Test
-    public void testMstFromC() throws Exception {
-        verifyMst(new Prim(graph).compute(c).getParents());
+    public void testMinimumFromC() throws Exception {
+        assertMinimum(new Prim(graph).computeMinimumSpanningTree(c).getSpanningTree());
     }
 
     @Test
-    public void testMstFromD() throws Exception {
-        verifyMst(new Prim(graph).compute(d).getParents());
+    public void testMinimumFromD() throws Exception {
+        assertMinimum(new Prim(graph).computeMinimumSpanningTree(d).getSpanningTree());
     }
 
     @Test
-    public void testMstFromE() throws Exception {
-        verifyMst(new Prim(graph).compute(d).getParents());
+    public void testMinimumFromE() throws Exception {
+        assertMinimum(new Prim(graph).computeMinimumSpanningTree(d).getSpanningTree());
     }
 
-    private void verifyMst(int[] mst) {
+    private void assertMinimum(Prim.SpanningTree mst) {
         final AssertingConsumer consumer = new AssertingConsumer();
-
-        for (int i = 0; i < mst.length; i++) {
-            consumer.accept(mst[i], i, -1L);
-        }
-
+        mst.forEach(consumer);
         consumer.assertContains(a, b);
         consumer.assertContains(a, c);
         consumer.assertContains(b, d);
         consumer.assertContains(c, e);
+    }
+
+    private void assertMaximum(Prim.SpanningTree mst) {
+        final AssertingConsumer consumer = new AssertingConsumer();
+        mst.forEach(consumer);
+        print(mst.parent);
+        consumer.assertContains(a, c);
+        consumer.assertContains(c, e);
+        consumer.assertContains(d, e);
+        consumer.assertContains(b, d);
+    }
+
+    private static void print(int[] parents) {
+        for (int i = 0; i < parents.length; i++) {
+            System.out.printf("%2d ", parents[i]);
+        }
+        System.out.println();
+        for (int i = 0; i < parents.length; i++) {
+            System.out.printf("%2d ", i);
+        }
+        System.out.println("\n");
     }
 
     private static class AssertingConsumer implements RelationshipConsumer {

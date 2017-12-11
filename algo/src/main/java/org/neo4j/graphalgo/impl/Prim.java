@@ -20,6 +20,7 @@ package org.neo4j.graphalgo.impl;
 
 import com.carrotsearch.hppc.IntDoubleMap;
 import com.carrotsearch.hppc.IntDoubleScatterMap;
+import com.carrotsearch.hppc.predicates.DoubleDoublePredicate;
 import org.neo4j.graphalgo.api.*;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
@@ -47,62 +48,21 @@ public class Prim extends Algorithm<Prim> {
 
     private final Graph graph;
     private final int nodeCount;
-    private int effectiveNodeCount;
+
     private SpanningTree spanningTree;
 
     public Prim(Graph graph) {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
-
-    }
-
-    /**
-     * compute the minimum weight spanning tree starting at node startNode
-     */
-    public Prim compute(int startNode) {
-        return computeMinimumSpanningTree(startNode);
     }
 
     public Prim computeMaximumSpanningTree(int startNode) {
-
-        spanningTree = new SpanningTree(nodeCount);
-
-        final SharedIntPriorityQueue queue = new SharedIntPriorityQueue.Max(
-                nodeCount,
-                spanningTree.cost,
-                Double.MAX_VALUE);
-
-        this.effectiveNodeCount = 1;
-        final ProgressLogger logger = getProgressLogger();
-        final SimpleBitSet visited = new SimpleBitSet(nodeCount);
-        // initially add all relations from startNode to the priority queue
-        visited.put(startNode);
-        queue.add(startNode, 0.0);
-        spanningTree.cost.put(startNode, 0.0);
-        while (!queue.isEmpty() && running()) {
-            // retrieve cheapest transition
-            final int node = queue.pop();
-            visited.put(node);
-            effectiveNodeCount++;
-            // add new candidates
-            graph.forEachRelationship(node, Direction.OUTGOING, (s, t, r) -> {
-                if (visited.contains(t)) {
-                    return true;
-                }
-                final double w = graph.weightOf(s, t);
-                if (w > spanningTree.cost.getOrDefault(t, Double.MAX_VALUE)) {
-                    spanningTree.cost.put(t, w);
-                    queue.add(t, w);
-                    spanningTree.parent[t] = s;
-                }
-                return true;
-            });
-            logger.logProgress(nodeCount - 1, effectiveNodeCount);
-        }
+        spanningTree.cost.put(startNode, Double.MAX_VALUE);
+        prim(startNode, 0.0, (a, b) -> a > b);
         return this;
     }
 
-    public Prim computeMinimumSpanningTree(int startNode) {
+    private void prim2(int startNode, DoubleDoublePredicate predicate) {
 
         spanningTree = new SpanningTree(nodeCount);
 
@@ -111,13 +71,12 @@ public class Prim extends Algorithm<Prim> {
                 spanningTree.cost,
                 Double.MAX_VALUE);
 
-        this.effectiveNodeCount = 1;
         final ProgressLogger logger = getProgressLogger();
         final SimpleBitSet visited = new SimpleBitSet(nodeCount);
         // initially add all relations from startNode to the priority queue
         visited.put(startNode);
         queue.add(startNode, 0.0);
-        spanningTree.cost.put(startNode, 0.0);
+        int effectiveNodeCount = 1;
         while (!queue.isEmpty() && running()) {
             // retrieve cheapest transition
             final int node = queue.pop();
@@ -129,16 +88,72 @@ public class Prim extends Algorithm<Prim> {
                     return true;
                 }
                 final double w = graph.weightOf(s, t);
-                if (w < spanningTree.cost.getOrDefault(t, Double.MAX_VALUE)) {
+                if (predicate.apply(w, spanningTree.cost.getOrDefault(t, Double.MAX_VALUE))) {
                     spanningTree.cost.put(t, w);
                     queue.add(t, w);
                     spanningTree.parent[t] = s;
+                    spanningTree.maxW = Math.max(spanningTree.maxW, w);
+                    spanningTree.minW = Math.min(spanningTree.minW, w);
+                    spanningTree.sumW += w;
                 }
                 return true;
             });
             logger.logProgress(nodeCount - 1, effectiveNodeCount);
         }
+        spanningTree.effectiveNodeCount = effectiveNodeCount;
+        logger.logDone(() -> "Prim done");
+    }
+
+
+
+
+    public Prim computeMinimumSpanningTree(int startNode) {
+        spanningTree = new SpanningTree(nodeCount);
+        final SharedIntPriorityQueue queue = new SharedIntPriorityQueue.Min(
+                nodeCount,
+                spanningTree.cost,
+                Double.MAX_VALUE);
+        spanningTree.cost.put(startNode, 0.0);
+        prim(startNode, queue, Double.MAX_VALUE, (a, b) -> a < b);
         return this;
+    }
+
+    private void prim(int startNode, SharedIntPriorityQueue queue, double defaultValue, DoubleDoublePredicate predicate) {
+        int effectiveNodeCount = 1;
+        final ProgressLogger logger = getProgressLogger();
+        final SimpleBitSet visited = new SimpleBitSet(nodeCount);
+        // initially add all relations from startNode to the priority queue
+        visited.put(startNode);
+        queue.add(startNode, 0.0);
+        while (!queue.isEmpty() && running()) {
+            // retrieve cheapest transition
+            final int node = queue.pop();
+            visited.put(node);
+            effectiveNodeCount++;
+            // add new candidates
+            graph.forEachRelationship(node, Direction.OUTGOING, (s, t, r) -> {
+                if (visited.contains(t)) {
+                    return true;
+                }
+                final double w = graph.weightOf(s, t);
+                if (predicate.apply(w, spanningTree.cost.getOrDefault(t, defaultValue))) {
+                    spanningTree.cost.put(t, w);
+                    queue.add(t, w);
+                    spanningTree.parent[t] = s;
+                    spanningTree.maxW = Math.max(spanningTree.maxW, w);
+                    spanningTree.minW = Math.min(spanningTree.minW, w);
+                    spanningTree.sumW += w;
+                }
+                return true;
+            });
+            logger.logProgress(nodeCount - 1, effectiveNodeCount);
+        }
+        spanningTree.effectiveNodeCount = effectiveNodeCount;
+        logger.logDone(() -> "Prim done");
+    }
+
+    public SpanningTree getSpanningTree() {
+        return spanningTree;
     }
 
     @Override
@@ -152,24 +167,47 @@ public class Prim extends Algorithm<Prim> {
         return this;
     }
 
-    public int getEffectiveNodeCount() {
-        return effectiveNodeCount;
-    }
-
     public static class SpanningTree {
 
+        public final int nodeCount;
         public final int[] parent;
-        public final IntDoubleMap cost;
+        public final IntDoubleMap cost; // rm
+        private int effectiveNodeCount;
+        private double sumW = 0.0;
+        private double minW = Double.MAX_VALUE;
+        private double maxW = 0.0;
 
         public SpanningTree(int nodeCount) {
+            this.nodeCount = nodeCount;
             parent = new int[nodeCount];
             Arrays.fill(parent, -1);
             cost = new IntDoubleScatterMap();
         }
 
-        public SpanningTree(int[] parent, IntDoubleMap cost) {
-            this.parent = parent;
-            this.cost = cost;
+        public void forEach(RelationshipConsumer consumer) {
+            for (int i = 0; i < nodeCount; i++) {
+                final int parent = this.parent[i];
+                if (parent == -1) {
+                    continue;
+                }
+                consumer.accept(parent, i, -1L);
+            }
+        }
+
+        public int getEffectiveNodeCount() {
+            return effectiveNodeCount;
+        }
+
+        public double getSumW() {
+            return sumW;
+        }
+
+        public double getMinW() {
+            return minW;
+        }
+
+        public double getMaxW() {
+            return maxW;
         }
     }
 
@@ -200,10 +238,10 @@ public class Prim extends Algorithm<Prim> {
 
     public static class Builder extends AbstractResultBuilder<Result> {
 
-        protected double weightSum = 0.0;
-        protected double weightMin = 0.0;
-        protected double weightMax = 0.0;
-        protected int effectiveNodeCount = 0;
+        protected double weightSum;
+        protected double weightMin;
+        protected double weightMax;
+        protected int effectiveNodeCount;
 
         public Builder withWeightSum(double weightSum) {
             this.weightSum = weightSum;
@@ -230,7 +268,9 @@ public class Prim extends Algorithm<Prim> {
                     evalDuration,
                     writeDuration,
                     weightSum,
-                    weightMin, weightMax, effectiveNodeCount);
+                    weightMin,
+                    weightMax,
+                    effectiveNodeCount);
         }
     }
 
