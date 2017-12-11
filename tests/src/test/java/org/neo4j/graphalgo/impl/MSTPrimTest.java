@@ -18,7 +18,6 @@
  */
 package org.neo4j.graphalgo.impl;
 
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -29,8 +28,6 @@ import org.neo4j.graphalgo.api.GraphFactory;
 import org.neo4j.graphalgo.api.RelationshipConsumer;
 import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.huge.HugeGraphFactory;
-import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
-import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.test.rule.ImpermanentDatabaseRule;
@@ -41,6 +38,7 @@ import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+
 
 /**
  * Tests if MSTPrim returns a valid MST for each node
@@ -94,6 +92,10 @@ public class MSTPrimTest {
     @Parameterized.Parameters(name = "{1}")
     public static Collection<Object[]> data() {
         return Collections.singleton(new Object[]{HugeGraphFactory.class, "Huge"});
+//        return Arrays.asList(
+//                new Object[]{HeavyGraphFactory.class, "Heavy"},
+//                new Object[]{HugeGraphFactory.class, "Huge"}
+//        );
     }
 
 
@@ -108,7 +110,6 @@ public class MSTPrimTest {
                 .withRelationshipType("TYPE")
                 .withRelationshipWeightsFromProperty("cost", Double.MAX_VALUE)
                 .withoutNodeWeights()
-                .withDirection(Direction.BOTH)
                 .asUndirected(true)
                 .load(graphImpl);
 
@@ -124,32 +125,36 @@ public class MSTPrimTest {
 
     @Test
     public void testMstFromA() throws Exception {
-        verifyMst(new MSTPrim(graph).compute(a).getMinimumSpanningTree());
+        verifyMst(new Prim(graph).compute(a).getParents());
     }
 
     @Test
     public void testMstFromB() throws Exception {
-        verifyMst(new MSTPrim(graph).compute(b).getMinimumSpanningTree());
+        verifyMst(new Prim(graph).compute(b).getParents());
     }
 
     @Test
     public void testMstFromC() throws Exception {
-        verifyMst(new MSTPrim(graph).compute(c).getMinimumSpanningTree());
+        verifyMst(new Prim(graph).compute(c).getParents());
     }
 
     @Test
     public void testMstFromD() throws Exception {
-        verifyMst(new MSTPrim(graph).compute(d).getMinimumSpanningTree());
+        verifyMst(new Prim(graph).compute(d).getParents());
     }
 
     @Test
     public void testMstFromE() throws Exception {
-        verifyMst(new MSTPrim(graph).compute(d).getMinimumSpanningTree());
+        verifyMst(new Prim(graph).compute(d).getParents());
     }
 
-    private void verifyMst(UndirectedTree mst) {
+    private void verifyMst(int[] mst) {
         final AssertingConsumer consumer = new AssertingConsumer();
-        mst.forEachDFS(a, consumer);
+
+        for (int i = 0; i < mst.length; i++) {
+            consumer.accept(mst[i], i, -1L);
+        }
+
         consumer.assertContains(a, b);
         consumer.assertContains(a, c);
         consumer.assertContains(b, d);
@@ -172,12 +177,9 @@ public class MSTPrimTest {
             public boolean equals(Object o) {
                 if (this == o) return true;
                 if (o == null || getClass() != o.getClass()) return false;
-
                 Pair pair = (Pair) o;
-
                 if (a != pair.a) return false;
                 return b == pair.b;
-
             }
 
             @Override

@@ -99,16 +99,4 @@ public class KMeansTest {
         System.out.println(setStruct);
     }
 
-    @Test
-    public void testMST() throws Exception {
-
-        final UndirectedTree minimumSpanningTree = new MSTPrim(graph).compute(a)
-                .getMinimumSpanningTree();
-
-        minimumSpanningTree.forEachBFS(a, (s, t, r) -> {
-            System.out.println(s + " -> " + t);
-            return true;
-        });
-
-    }
 }

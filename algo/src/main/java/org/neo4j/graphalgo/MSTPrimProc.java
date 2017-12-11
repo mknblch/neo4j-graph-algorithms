@@ -27,9 +27,7 @@ import org.neo4j.graphalgo.core.utils.Pools;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.ProgressTimer;
 import org.neo4j.graphalgo.core.utils.TerminationFlag;
-import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
-import org.neo4j.graphalgo.core.write.Exporter;
-import org.neo4j.graphalgo.impl.MSTPrim;
+import org.neo4j.graphalgo.impl.Prim;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.kernel.api.DataWriteOperations;
 import org.neo4j.kernel.api.KernelTransaction;
@@ -63,7 +61,7 @@ public class MSTPrimProc {
     @Description("CALL algo.mst(label:String, relationshipType:String, weightProperty:String, startNodeId:long, {" +
             "writeProperty:String}) " +
             "YIELD loadMillis, computeMillis, writeMillis, weightSum, effectiveNodeCount")
-    public Stream<MSTPrim.Result> mst(
+    public Stream<Prim.Result> mst(
             @Name(value = "label") String label,
             @Name(value = "relationshipType") String relationship,
             @Name(value = "weightProperty") String weightProperty,
@@ -71,7 +69,7 @@ public class MSTPrimProc {
             @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
 
         final ProcedureConfiguration configuration = ProcedureConfiguration.create(config);
-        final MSTPrim.Builder builder = new MSTPrim.Builder();
+        final Prim.Builder builder = new Prim.Builder();
         final Graph graph;
 
         try (ProgressTimer timer = builder.timeLoad()) {
@@ -88,7 +86,7 @@ public class MSTPrimProc {
 
         final int root = graph.toMappedNodeId(startNode);
 
-        final MSTPrim mstPrim = new MSTPrim(graph)
+        final Prim mstPrim = new Prim(graph)
                 .withProgressLogger(ProgressLogger.wrap(log, "MST(Prim)"))
                 .withTerminationFlag(TerminationFlag.wrap(transaction));
 
@@ -101,20 +99,20 @@ public class MSTPrimProc {
                 .withWeightMin(mstPrim.getMinW())
                 .withEffectiveNodeCount(mstPrim.getEffectiveNodeCount());
 
-        if (configuration.isWriteFlag()) {
-            final UndirectedTree minimumSpanningTree = mstPrim.getMinimumSpanningTree();
-            mstPrim.release();
-            builder.timeWrite(() -> {
-                Exporter.of(graph, api)
-                        .withLog(log)
-                        .build()
-                        .writeRelationshipAndProperty(
-                                configuration.get(CONFIG_WRITE_RELATIONSHIP, CONFIG_WRITE_RELATIONSHIP_DEFAULT),
-                                weightProperty,
-                                (ops, relType, propertyType) -> minimumSpanningTree.forEachBFS(root, writeBack(relType, propertyType, graph, ops))
-                        );
-            });
-        }
+//        if (configuration.isWriteFlag()) {
+//            final UndirectedTree minimumSpanningTree = mstPrim.getMinimumSpanningTree();
+//            mstPrim.release();
+//            builder.timeWrite(() -> {
+//                Exporter.of(graph, api)
+//                        .withLog(log)
+//                        .build()
+//                        .writeRelationshipAndProperty(
+//                                configuration.get(CONFIG_WRITE_RELATIONSHIP, CONFIG_WRITE_RELATIONSHIP_DEFAULT),
+//                                weightProperty,
+//                                (ops, relType, propertyType) -> minimumSpanningTree.forEachBFS(root, writeBack(relType, propertyType, graph, ops))
+//                        );
+//            });
+//        }
 
         return Stream.of(builder.build());
     }

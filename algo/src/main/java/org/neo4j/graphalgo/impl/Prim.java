@@ -18,20 +18,17 @@
  */
 package org.neo4j.graphalgo.impl;
 
-import com.carrotsearch.hppc.IntDoubleHashMap;
 import com.carrotsearch.hppc.IntDoubleMap;
+import com.carrotsearch.hppc.IntDoubleScatterMap;
 import org.neo4j.graphalgo.api.*;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
-import org.neo4j.graphalgo.core.utils.queue.LongMinPriorityQueue;
-import org.neo4j.graphalgo.core.utils.queue.SharedIntMinPriorityQueue;
+import org.neo4j.graphalgo.core.utils.queue.SharedIntPriorityQueue;
 import org.neo4j.graphalgo.core.utils.traverse.SimpleBitSet;
 import org.neo4j.graphalgo.results.AbstractResultBuilder;
 import org.neo4j.graphdb.Direction;
 
 import java.util.Arrays;
-
-import static org.neo4j.graphalgo.core.utils.RawValues.*;
 
 /**
  * Sequential Single-Source minimum weight spanning tree algorithm (PRIM).
@@ -46,62 +43,97 @@ import static org.neo4j.graphalgo.core.utils.RawValues.*;
  *
  * @author mknblch
  */
-public class MSTPrim extends Algorithm<MSTPrim> {
+public class Prim extends Algorithm<Prim> {
 
     private final Graph graph;
     private final int nodeCount;
-    private final int[] parents;
-    private final IntDoubleMap pi;
-    private final SharedIntMinPriorityQueue queue;
-    private double sumW;
-    private double minW;
-    private double maxW;
-
     private int effectiveNodeCount;
+    private SpanningTree spanningTree;
 
-    public MSTPrim(Graph graph) {
+    public Prim(Graph graph) {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
-        parents = new int[nodeCount];
-        Arrays.fill(parents, -1);
-        pi = new IntDoubleHashMap();
-        queue = new SharedIntMinPriorityQueue(
-                nodeCount,
-                pi,
-                Double.MAX_VALUE);
+
     }
 
     /**
      * compute the minimum weight spanning tree starting at node startNode
      */
-    public MSTPrim compute(int startNode) {
-        this.sumW = 0.0;
-        this.maxW = 0.0;
-        this.minW = Double.MAX_VALUE;
+    public Prim compute(int startNode) {
+        return computeMinimumSpanningTree(startNode);
+    }
+
+    public Prim computeMaximumSpanningTree(int startNode) {
+
+        spanningTree = new SpanningTree(nodeCount);
+
+        final SharedIntPriorityQueue queue = new SharedIntPriorityQueue.Max(
+                nodeCount,
+                spanningTree.cost,
+                Double.MAX_VALUE);
+
         this.effectiveNodeCount = 1;
         final ProgressLogger logger = getProgressLogger();
         final SimpleBitSet visited = new SimpleBitSet(nodeCount);
         // initially add all relations from startNode to the priority queue
         visited.put(startNode);
         queue.add(startNode, 0.0);
-
+        spanningTree.cost.put(startNode, 0.0);
         while (!queue.isEmpty() && running()) {
             // retrieve cheapest transition
             final int node = queue.pop();
-            if (visited.contains(node)) {
-                continue;
-            }
             visited.put(node);
-            final double w = graph.weightOf(headId, node);
-
             effectiveNodeCount++;
-
             // add new candidates
-            graph.forEachRelationship(tailId, Direction.BOTH, (s, t, r) -> {
+            graph.forEachRelationship(node, Direction.OUTGOING, (s, t, r) -> {
+                if (visited.contains(t)) {
+                    return true;
+                }
+                final double w = graph.weightOf(s, t);
+                if (w > spanningTree.cost.getOrDefault(t, Double.MAX_VALUE)) {
+                    spanningTree.cost.put(t, w);
+                    queue.add(t, w);
+                    spanningTree.parent[t] = s;
+                }
+                return true;
+            });
+            logger.logProgress(nodeCount - 1, effectiveNodeCount);
+        }
+        return this;
+    }
 
-                System.out.println("add " +  s  + " -> " + t  + " :" + graph.weightOf(s, t));
+    public Prim computeMinimumSpanningTree(int startNode) {
 
-                queue.add(combineIntInt(s, t), graph.weightOf(s, t));
+        spanningTree = new SpanningTree(nodeCount);
+
+        final SharedIntPriorityQueue queue = new SharedIntPriorityQueue.Min(
+                nodeCount,
+                spanningTree.cost,
+                Double.MAX_VALUE);
+
+        this.effectiveNodeCount = 1;
+        final ProgressLogger logger = getProgressLogger();
+        final SimpleBitSet visited = new SimpleBitSet(nodeCount);
+        // initially add all relations from startNode to the priority queue
+        visited.put(startNode);
+        queue.add(startNode, 0.0);
+        spanningTree.cost.put(startNode, 0.0);
+        while (!queue.isEmpty() && running()) {
+            // retrieve cheapest transition
+            final int node = queue.pop();
+            visited.put(node);
+            effectiveNodeCount++;
+            // add new candidates
+            graph.forEachRelationship(node, Direction.OUTGOING, (s, t, r) -> {
+                if (visited.contains(t)) {
+                    return true;
+                }
+                final double w = graph.weightOf(s, t);
+                if (w < spanningTree.cost.getOrDefault(t, Double.MAX_VALUE)) {
+                    spanningTree.cost.put(t, w);
+                    queue.add(t, w);
+                    spanningTree.parent[t] = s;
+                }
                 return true;
             });
             logger.logProgress(nodeCount - 1, effectiveNodeCount);
@@ -110,29 +142,35 @@ public class MSTPrim extends Algorithm<MSTPrim> {
     }
 
     @Override
-    public MSTPrim me() {
+    public Prim me() {
         return this;
     }
 
     @Override
-    public MSTPrim release() {
-        return null;
+    public Prim release() {
+        spanningTree = null;
+        return this;
     }
 
     public int getEffectiveNodeCount() {
         return effectiveNodeCount;
     }
 
-    public double getSumW() {
-        return sumW;
-    }
+    public static class SpanningTree {
 
-    public double getMinW() {
-        return minW;
-    }
+        public final int[] parent;
+        public final IntDoubleMap cost;
 
-    public double getMaxW() {
-        return maxW;
+        public SpanningTree(int nodeCount) {
+            parent = new int[nodeCount];
+            Arrays.fill(parent, -1);
+            cost = new IntDoubleScatterMap();
+        }
+
+        public SpanningTree(int[] parent, IntDoubleMap cost) {
+            this.parent = parent;
+            this.cost = cost;
+        }
     }
 
     public static class Result {

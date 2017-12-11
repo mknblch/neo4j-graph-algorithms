@@ -67,6 +67,10 @@ public abstract class IntPriorityQueue implements PrimitiveIntIterable {
         this.heap = new int[ArrayUtil.oversize(heapSize, Integer.BYTES)];
     }
 
+    public double getCost(int node) {
+        return cost(node);
+    }
+
     /**
      * Defines the ordering of the queue.
      * Returns true iff {@code a} is strictly less than {@code b}.
