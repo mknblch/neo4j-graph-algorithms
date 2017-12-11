@@ -18,13 +18,18 @@
  */
 package org.neo4j.graphalgo.impl;
 
+import com.carrotsearch.hppc.IntDoubleHashMap;
+import com.carrotsearch.hppc.IntDoubleMap;
 import org.neo4j.graphalgo.api.*;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
 import org.neo4j.graphalgo.core.utils.queue.LongMinPriorityQueue;
+import org.neo4j.graphalgo.core.utils.queue.SharedIntMinPriorityQueue;
 import org.neo4j.graphalgo.core.utils.traverse.SimpleBitSet;
 import org.neo4j.graphalgo.results.AbstractResultBuilder;
 import org.neo4j.graphdb.Direction;
+
+import java.util.Arrays;
 
 import static org.neo4j.graphalgo.core.utils.RawValues.*;
 
@@ -45,9 +50,9 @@ public class MSTPrim extends Algorithm<MSTPrim> {
 
     private final Graph graph;
     private final int nodeCount;
-
-    private UndirectedTree minimumSpanningTree;
-
+    private final int[] parents;
+    private final IntDoubleMap pi;
+    private final SharedIntMinPriorityQueue queue;
     private double sumW;
     private double minW;
     private double maxW;
@@ -57,6 +62,13 @@ public class MSTPrim extends Algorithm<MSTPrim> {
     public MSTPrim(Graph graph) {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
+        parents = new int[nodeCount];
+        Arrays.fill(parents, -1);
+        pi = new IntDoubleHashMap();
+        queue = new SharedIntMinPriorityQueue(
+                nodeCount,
+                pi,
+                Double.MAX_VALUE);
     }
 
     /**
@@ -68,43 +80,33 @@ public class MSTPrim extends Algorithm<MSTPrim> {
         this.minW = Double.MAX_VALUE;
         this.effectiveNodeCount = 1;
         final ProgressLogger logger = getProgressLogger();
-        final LongMinPriorityQueue queue = new LongMinPriorityQueue();
         final SimpleBitSet visited = new SimpleBitSet(nodeCount);
-        minimumSpanningTree = new UndirectedTree(nodeCount);
         // initially add all relations from startNode to the priority queue
         visited.put(startNode);
-        graph.forEachRelationship(startNode, Direction.OUTGOING, (s, t, r) -> {
-            // encode relationship as long
-            queue.add(combineIntInt(s, t), graph.weightOf(s, t));
-            return true;
-        });
+        queue.add(startNode, 0.0);
+
         while (!queue.isEmpty() && running()) {
             // retrieve cheapest transition
-            final long transition = queue.pop();
-            final int tailId = getTail(transition);
-            if (visited.contains(tailId)) {
+            final int node = queue.pop();
+            if (visited.contains(node)) {
                 continue;
             }
-            visited.put(tailId);
-            final int headId = getHead(transition);
-            minimumSpanningTree.addRelationship(headId, tailId);
-            final double w = graph.weightOf(headId, tailId);
-            this.sumW += w;
-            this.minW = Math.min(minW, w);
-            this.maxW = Math.max(maxW, w);
+            visited.put(node);
+            final double w = graph.weightOf(headId, node);
+
             effectiveNodeCount++;
+
             // add new candidates
-            graph.forEachRelationship(tailId, Direction.OUTGOING, (s, t, r) -> {
+            graph.forEachRelationship(tailId, Direction.BOTH, (s, t, r) -> {
+
+                System.out.println("add " +  s  + " -> " + t  + " :" + graph.weightOf(s, t));
+
                 queue.add(combineIntInt(s, t), graph.weightOf(s, t));
                 return true;
             });
             logger.logProgress(nodeCount - 1, effectiveNodeCount);
         }
         return this;
-    }
-
-    public UndirectedTree getMinimumSpanningTree() {
-        return minimumSpanningTree;
     }
 
     @Override
@@ -114,7 +116,6 @@ public class MSTPrim extends Algorithm<MSTPrim> {
 
     @Override
     public MSTPrim release() {
-        minimumSpanningTree = null;
         return null;
     }
 

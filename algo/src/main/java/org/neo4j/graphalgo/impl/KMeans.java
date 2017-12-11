@@ -18,9 +18,14 @@
  */
 package org.neo4j.graphalgo.impl;
 
+import com.carrotsearch.hppc.IntScatterSet;
+import com.carrotsearch.hppc.IntSet;
+import com.carrotsearch.hppc.cursors.IntCursor;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
+import org.neo4j.graphalgo.core.utils.dss.DisjointSetStruct;
+import org.neo4j.graphalgo.core.utils.queue.LongMaxPriorityQueue;
 import org.neo4j.graphalgo.core.utils.queue.LongMinPriorityQueue;
 import org.neo4j.graphalgo.core.utils.traverse.SimpleBitSet;
 import org.neo4j.graphalgo.results.AbstractResultBuilder;
@@ -43,42 +48,37 @@ import static org.neo4j.graphalgo.core.utils.RawValues.*;
  */
 public class KMeans extends Algorithm<KMeans> {
 
-    private final Graph graph;
+    private Graph graph;
+    private DisjointSetStruct setStruct;
+
     private final int nodeCount;
+    private final int k;
 
-    private UndirectedTree minimumSpanningTree;
-    private final LongMin
-
-    private double sumW;
-    private double minW;
-    private double maxW;
-
-    private int effectiveNodeCount;
-
-    public KMeans(Graph graph) {
+    public KMeans(Graph graph, int k) {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
+        setStruct = new DisjointSetStruct(nodeCount);
+        this.k = k;
     }
 
     /**
      * compute the minimum weight spanning tree starting at node startNode
      */
     public KMeans compute(int startNode) {
-        this.sumW = 0.0;
-        this.maxW = 0.0;
-        this.minW = Double.MAX_VALUE;
-        this.effectiveNodeCount = 1;
         final ProgressLogger logger = getProgressLogger();
-        final LongMinPriorityQueue queue = new LongMinPriorityQueue();
+        final LongMaxPriorityQueue queue = new LongMaxPriorityQueue();
         final SimpleBitSet visited = new SimpleBitSet(nodeCount);
-        minimumSpanningTree = new UndirectedTree(nodeCount);
+        final UndirectedTree minimumSpanningTree = new UndirectedTree(nodeCount);
+        final LongMinPriorityQueue maxQueue = new LongMinPriorityQueue(nodeCount);
         // initially add all relations from startNode to the priority queue
         visited.put(startNode);
-        graph.forEachRelationship(startNode, Direction.OUTGOING, (s, t, r) -> {
+        graph.forEachRelationship(startNode, Direction.BOTH, (s, t, r) -> {
             // encode relationship as long
+            System.out.println("add " +  s  + " -> " + t  + " :" + graph.weightOf(s, t));
             queue.add(combineIntInt(s, t), graph.weightOf(s, t));
             return true;
         });
+        int effectiveNodeCount = 1;
         while (!queue.isEmpty() && running()) {
             // retrieve cheapest transition
             final long transition = queue.pop();
@@ -88,26 +88,44 @@ public class KMeans extends Algorithm<KMeans> {
             }
             visited.put(tailId);
             final int headId = getHead(transition);
-            minimumSpanningTree.addRelationship(headId, tailId);
             final double w = graph.weightOf(headId, tailId);
-            this.sumW += w;
-            this.minW = Math.min(minW, w);
-            this.maxW = Math.max(maxW, w);
+            minimumSpanningTree.addRelationship(headId, tailId);
+            maxQueue.add(transition, w);
+            System.out.println(" mst " + headId + " -> " + tailId + " : " + w);
             effectiveNodeCount++;
             // add new candidates
-            graph.forEachRelationship(tailId, Direction.OUTGOING, (s, t, r) -> {
+            graph.forEachRelationship(tailId, Direction.BOTH, (s, t, r) -> {
+                System.out.println("add " +  s  + " -> " + t  + " :" + graph.weightOf(s, t));
                 queue.add(combineIntInt(s, t), graph.weightOf(s, t));
                 return true;
             });
-            logger.logProgress(nodeCount - 1, effectiveNodeCount);
+            logger.logProgress(nodeCount - 1, effectiveNodeCount, () -> "mst calculation");
+        }
+        logger.logProgress(0, () -> "clustering");
+        final IntSet roots = new IntScatterSet();
+        for (int i = 0; i < k; i++) {
+            final long transition = maxQueue.pop();
+            final int head = getHead(transition);
+            final int tail = getTail(transition);
+            System.out.println("split at " + head + " / " + tail);
+            minimumSpanningTree.removeRelationship(head, tail);
+            roots.add(head);
+            roots.add(tail);
+        }
+        setStruct.reset();
+        for (IntCursor root : roots) {
+            System.out.println("root = " + root.value);
+            minimumSpanningTree.forEachDFS(root.value, (s, t, r) -> {
+                System.out.println("join " + s +  " -> " + t);
+                setStruct.union(s, t);
+                return true;
+            });
         }
         return this;
     }
 
-
-
-    public UndirectedTree getMinimumSpanningTree() {
-        return minimumSpanningTree;
+    public DisjointSetStruct getSetStruct() {
+        return setStruct;
     }
 
     @Override
@@ -117,24 +135,9 @@ public class KMeans extends Algorithm<KMeans> {
 
     @Override
     public KMeans release() {
-        minimumSpanningTree = null;
-        return null;
-    }
-
-    public int getEffectiveNodeCount() {
-        return effectiveNodeCount;
-    }
-
-    public double getSumW() {
-        return sumW;
-    }
-
-    public double getMinW() {
-        return minW;
-    }
-
-    public double getMaxW() {
-        return maxW;
+        graph = null;
+        setStruct = null;
+        return this;
     }
 
     public static class Result {
@@ -142,10 +145,6 @@ public class KMeans extends Algorithm<KMeans> {
         public final long loadMillis;
         public final long computeMillis;
         public final long writeMillis;
-        public final double weightSum;
-        public final double weightMin;
-        public final double weightMax;
-        public final long effectiveNodeCount;
 
         public Result(long loadMillis,
                       long computeMillis,
@@ -155,46 +154,13 @@ public class KMeans extends Algorithm<KMeans> {
             this.loadMillis = loadMillis;
             this.computeMillis = computeMillis;
             this.writeMillis = writeMillis;
-            this.weightSum = weightSum;
-            this.weightMin = weightMin;
-            this.weightMax = weightMax;
-            this.effectiveNodeCount = effectiveNodeCount;
         }
     }
 
     public static class Builder extends AbstractResultBuilder<Result> {
 
-        protected double weightSum = 0.0;
-        protected double weightMin = 0.0;
-        protected double weightMax = 0.0;
-        protected int effectiveNodeCount = 0;
-
-        public Builder withWeightSum(double weightSum) {
-            this.weightSum = weightSum;
-            return this;
-        }
-
-        public Builder withWeightMin(double weightMin) {
-            this.weightMin = weightMin;
-            return this;
-        }
-
-        public Builder withWeightMax(double weightMax) {
-            this.weightMax = weightMax;
-            return this;
-        }
-
-        public Builder withEffectiveNodeCount(int effectiveNodeCount) {
-            this.effectiveNodeCount = effectiveNodeCount;
-            return this;
-        }
-
         public Result build() {
-            return new Result(loadDuration,
-                    evalDuration,
-                    writeDuration,
-                    weightSum,
-                    weightMin, weightMax, effectiveNodeCount);
+            return null;
         }
     }
 
