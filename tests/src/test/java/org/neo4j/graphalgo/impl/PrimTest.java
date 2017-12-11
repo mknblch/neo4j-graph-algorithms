@@ -37,11 +37,12 @@ import java.util.Collection;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 
 /**
- * Tests if MSTPrim returns a valid MST for each node
+ * Tests if MSTPrim returns a valid tree for each node
  *
  *         a                  a                  a
  *     1 /   \ 2            /  \                  \
@@ -52,14 +53,13 @@ import static org.junit.Assert.assertTrue;
  *     |       |          |      |          |       |
  *     d --6-- e          d      e          d-------e
  *
- *
  * @author mknobloch
  */
 @RunWith(Parameterized.class)
 public class PrimTest {
 
     private final Label label;
-    private int a, b, c, d, e;
+    private int a, b, c, d, e, y, z;
 
     private static final String cypher =
             "CREATE (a:Node {name:'a'})\n" +
@@ -67,7 +67,8 @@ public class PrimTest {
             "CREATE (c:Node {name:'c'})\n" +
             "CREATE (d:Node {name:'d'})\n" +
             "CREATE (e:Node {name:'e'})\n" +
-            "CREATE (f:Node {name:'f'})\n" +
+            "CREATE (y:Node {name:'y'})\n" +
+            "CREATE (z:Node {name:'z'})\n" +
             "CREATE" +
             " (a)-[:TYPE {cost:1.0}]->(b),\n" +
             " (a)-[:TYPE {cost:2.0}]->(c),\n" +
@@ -120,6 +121,8 @@ public class PrimTest {
             c = graph.toMappedNodeId(DB.findNode(label, "name", "c").getId());
             d = graph.toMappedNodeId(DB.findNode(label, "name", "d").getId());
             e = graph.toMappedNodeId(DB.findNode(label, "name", "e").getId());
+            y = graph.toMappedNodeId(DB.findNode(label, "name", "y").getId());
+            z = graph.toMappedNodeId(DB.findNode(label, "name", "z").getId());
             transaction.success();
         }
     }
@@ -128,6 +131,27 @@ public class PrimTest {
     public void testMaximumFromA() throws Exception {
         assertMaximum(new Prim(graph).computeMaximumSpanningTree(a).getSpanningTree());
     }
+
+    @Test
+    public void testMaximumFromB() throws Exception {
+        assertMaximum(new Prim(graph).computeMaximumSpanningTree(b).getSpanningTree());
+    }
+
+    @Test
+    public void testMaximumFromC() throws Exception {
+        assertMaximum(new Prim(graph).computeMaximumSpanningTree(c).getSpanningTree());
+    }
+
+    @Test
+    public void testMaximumFromD() throws Exception {
+        assertMaximum(new Prim(graph).computeMaximumSpanningTree(d).getSpanningTree());
+    }
+
+    @Test
+    public void testMaximumFromE() throws Exception {
+        assertMaximum(new Prim(graph).computeMaximumSpanningTree(e).getSpanningTree());
+    }
+
     @Test
     public void testMinimumFromA() throws Exception {
         assertMinimum(new Prim(graph).computeMinimumSpanningTree(a).getSpanningTree());
@@ -156,10 +180,16 @@ public class PrimTest {
     private void assertMinimum(Prim.SpanningTree mst) {
         final AssertingConsumer consumer = new AssertingConsumer();
         mst.forEach(consumer);
+        print(mst.parent);
         consumer.assertContains(a, b);
         consumer.assertContains(a, c);
         consumer.assertContains(b, d);
         consumer.assertContains(c, e);
+        consumer.assertAbsent(b, c);
+        consumer.assertAbsent(d, e);
+        assertEquals(5, mst.getEffectiveNodeCount());
+        assertEquals(-1 , mst.parent[y]);
+        assertEquals(-1 , mst.parent[z]);
     }
 
     private void assertMaximum(Prim.SpanningTree mst) {
@@ -170,6 +200,11 @@ public class PrimTest {
         consumer.assertContains(c, e);
         consumer.assertContains(d, e);
         consumer.assertContains(b, d);
+        consumer.assertAbsent(a, b);
+        consumer.assertAbsent(b, c);
+        assertEquals(5, mst.getEffectiveNodeCount());
+        assertEquals(-1 , mst.parent[y]);
+        assertEquals(-1 , mst.parent[z]);
     }
 
     private static void print(int[] parents) {
@@ -228,6 +263,10 @@ public class PrimTest {
 
         public void assertContains(int a, int b) {
             assertTrue("{" + a + "," + b + "} not found",
+                    pairs.contains(new Pair(Math.min(a, b), Math.max(a, b))));
+        }
+        public void assertAbsent(int a, int b) {
+            assertFalse("{" + a + "," + b + "} not found",
                     pairs.contains(new Pair(Math.min(a, b), Math.max(a, b))));
         }
     }

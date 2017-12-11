@@ -44,10 +44,10 @@ import java.util.stream.Stream;
 /**
  * @author mknblch
  */
-public class MSTPrimProc {
+public class PrimProc {
 
     public static final String CONFIG_WRITE_RELATIONSHIP = "writeProperty";
-    public static final String CONFIG_WRITE_RELATIONSHIP_DEFAULT = "mst";
+    public static final String CONFIG_WRITE_RELATIONSHIP_DEFAULT = "MST";
 
     @Context
     public GraphDatabaseAPI api;
@@ -58,23 +58,72 @@ public class MSTPrimProc {
     @Context
     public KernelTransaction transaction;
 
+
     @Procedure(value = "algo.mst", mode = Mode.WRITE)
     @Description("CALL algo.mst(label:String, relationshipType:String, weightProperty:String, startNodeId:long, {" +
             "writeProperty:String}) " +
-            "YIELD loadMillis, computeMillis, writeMillis, weightSum, effectiveNodeCount")
-    public Stream<Prim.Result> mst(
+            "YIELD loadMillis, computeMillis, writeMillis, effectiveNodeCount")
+    public Stream<Prim.Result> deprecatedProc(
+            @Name(value = "label") String label,
+            @Name(value = "relationshipType") String relationship,
+            @Name(value = "weightProperty") String weightProperty,
+            @Name(value = "startNodeId") long startNode,
+            @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
+        return minimumSpanningTree(label, relationship, weightProperty, startNode, config);
+    }
+
+    @Procedure(value = "algo.spanningTree", mode = Mode.WRITE)
+    @Description("CALL algo.spanningTree(label:String, relationshipType:String, weightProperty:String, startNodeId:long, {" +
+            "writeProperty:String}) " +
+            "YIELD loadMillis, computeMillis, writeMillis, effectiveNodeCount")
+    public Stream<Prim.Result> defaultProc(
+            @Name(value = "label") String label,
+            @Name(value = "relationshipType") String relationship,
+            @Name(value = "weightProperty") String weightProperty,
+            @Name(value = "startNodeId") long startNode,
+            @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
+        return spanningTree(label, relationship, weightProperty, startNode, config, false);
+    }
+
+    @Procedure(value = "algo.spanningTree.minimum", mode = Mode.WRITE)
+    @Description("CALL algo.spanningTree.minimum(label:String, relationshipType:String, weightProperty:String, startNodeId:long, {" +
+            "writeProperty:String}) " +
+            "YIELD loadMillis, computeMillis, writeMillis, effectiveNodeCount")
+    public Stream<Prim.Result> minimumSpanningTree(
             @Name(value = "label") String label,
             @Name(value = "relationshipType") String relationship,
             @Name(value = "weightProperty") String weightProperty,
             @Name(value = "startNodeId") long startNode,
             @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
 
+        return spanningTree(label, relationship, weightProperty, startNode, config, false);
+    }
+
+    @Procedure(value = "algo.spanningTree.maximum", mode = Mode.WRITE)
+    @Description("CALL algo.spanningTree.maximum(label:String, relationshipType:String, weightProperty:String, startNodeId:long, {" +
+            "writeProperty:String}) " +
+            "YIELD loadMillis, computeMillis, writeMillis, effectiveNodeCount")
+    public Stream<Prim.Result> maximumSpanningTree(
+            @Name(value = "label") String label,
+            @Name(value = "relationshipType") String relationship,
+            @Name(value = "weightProperty") String weightProperty,
+            @Name(value = "startNodeId") long startNode,
+            @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
+
+        return spanningTree(label, relationship, weightProperty, startNode, config, true);
+    }
+
+    public Stream<Prim.Result> spanningTree(String label,
+                                            String relationship,
+                                            String weightProperty,
+                                            long startNode,
+                                            Map<String, Object> config,
+                                            boolean max) {
+
         final ProcedureConfiguration configuration = ProcedureConfiguration.create(config);
         final Prim.Builder builder = new Prim.Builder();
         final Graph graph;
-
         try (ProgressTimer timer = builder.timeLoad()) {
-
             graph = new GraphLoader(api, Pools.DEFAULT)
                     .withOptionalLabel(label)
                     .withOptionalRelationshipType(relationship)
@@ -84,24 +133,19 @@ public class MSTPrimProc {
                     .withLog(log)
                     .load(configuration.getGraphImpl(HugeGraphFactory.class));
         }
-
         final int root = graph.toMappedNodeId(startNode);
-
         final Prim mstPrim = new Prim(graph)
-                .withProgressLogger(ProgressLogger.wrap(log, "MST(Prim)"))
+                .withProgressLogger(ProgressLogger.wrap(log, "Prim(MaximumSpanningTree)"))
                 .withTerminationFlag(TerminationFlag.wrap(transaction));
-
         builder.timeEval(() -> {
-            mstPrim.computeMinimumSpanningTree(root);
+            if (max) {
+                mstPrim.computeMaximumSpanningTree(root);
+            } else {
+                mstPrim.computeMinimumSpanningTree(root);
+            }
         });
-
         final Prim.SpanningTree spanningTree = mstPrim.getSpanningTree();
-
-        builder.withWeightSum(spanningTree.getSumW())
-                .withWeightMax(spanningTree.getMaxW())
-                .withWeightMin(spanningTree.getMinW())
-                .withEffectiveNodeCount(spanningTree.getEffectiveNodeCount());
-
+        builder.withEffectiveNodeCount(spanningTree.getEffectiveNodeCount());
         if (configuration.isWriteFlag()) {
             mstPrim.release();
             builder.timeWrite(() -> {
@@ -115,7 +159,6 @@ public class MSTPrimProc {
                         );
             });
         }
-
         return Stream.of(builder.build());
     }
 
