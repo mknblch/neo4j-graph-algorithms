@@ -45,7 +45,6 @@ import java.util.Arrays;
  */
 public class Prim extends Algorithm<Prim> {
 
-    private final IdMapping idMapping;
     private final RelationshipIterator relationshipIterator;
     private final RelationshipWeights weights;
     private final int nodeCount;
@@ -53,7 +52,6 @@ public class Prim extends Algorithm<Prim> {
     private SpanningTree spanningTree;
 
     public Prim(IdMapping idMapping, RelationshipIterator relationshipIterator, RelationshipWeights weights) {
-        this.idMapping = idMapping;
         this.relationshipIterator = relationshipIterator;
         this.weights = weights;
         nodeCount = Math.toIntExact(idMapping.nodeCount());
