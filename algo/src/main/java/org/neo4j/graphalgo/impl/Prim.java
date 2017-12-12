@@ -74,23 +74,21 @@ public class Prim extends Algorithm<Prim> {
                 Double.MAX_VALUE);
         final ProgressLogger logger = getProgressLogger();
         final SimpleBitSet visited = new SimpleBitSet(nodeCount);
-        // initially add all relations from startNode to the priority queue
         cost.put(startNode, 0.0);
         queue.add(startNode, -1.0);
-        int[] effectiveNodeCount = {0};
+        int effectiveNodeCount = 0;
         while (!queue.isEmpty() && running()) {
-            // retrieve cheapest transition
             final int node = queue.pop();
             if (visited.contains(node)) {
                 continue;
             }
-            effectiveNodeCount[0]++;
+            effectiveNodeCount++;
             visited.put(node);
             graph.forEachRelationship(node, Direction.OUTGOING, (s, t, r) -> {
                 if (visited.contains(t)) {
                     return true;
                 }
-                // invert weight for calculating maximum
+                // invert weight to calculate maximum
                 final double w = max ? -graph.weightOf(s, t) : graph.weightOf(s, t);
                 if (w < cost.getOrDefault(t, Double.MAX_VALUE)) {
                     cost.put(t, w);
@@ -99,9 +97,9 @@ public class Prim extends Algorithm<Prim> {
                 }
                 return true;
             });
-            logger.logProgress(nodeCount - 1, effectiveNodeCount[0]);
+            logger.logProgress(nodeCount - 1, effectiveNodeCount);
         }
-        spanningTree.effectiveNodeCount = effectiveNodeCount[0];
+        spanningTree.effectiveNodeCount = effectiveNodeCount;
         logger.logDone(() -> "Prim done");
         return spanningTree;
     }

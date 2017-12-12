@@ -1,5 +1,7 @@
 package org.neo4j.graphalgo.impl;
 
+import com.carrotsearch.hppc.cursors.IntCursor;
+import com.carrotsearch.hppc.procedures.IntProcedure;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -12,9 +14,6 @@ import org.neo4j.graphalgo.core.heavyweight.HeavyGraphFactory;
 import org.neo4j.graphalgo.core.huge.HugeGraphFactory;
 import org.neo4j.graphalgo.core.lightweight.LightGraphFactory;
 import org.neo4j.graphalgo.core.neo4jview.GraphViewFactory;
-import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
-import org.neo4j.graphalgo.core.utils.dss.DisjointSetStruct;
-import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.kernel.api.exceptions.KernelException;
@@ -22,6 +21,10 @@ import org.neo4j.test.rule.ImpermanentDatabaseRule;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 /**
  *          1
@@ -33,7 +36,7 @@ import java.util.Collection;
  * @author mknblch
  */
 @RunWith(Parameterized.class)
-public class KMeansTest {
+public class KSpanningTreeTest {
 
     private static final String cypher =
             "CREATE (a:Node {name:'a'})\n" +
@@ -53,12 +56,13 @@ public class KMeansTest {
 
     @Parameterized.Parameters(name = "{1}")
     public static Collection<Object[]> data() {
-        return Arrays.asList(
-                new Object[]{HeavyGraphFactory.class, "Heavy"},
-                new Object[]{LightGraphFactory.class, "Light"},
-                new Object[]{HugeGraphFactory.class, "Huge"},
-                new Object[]{GraphViewFactory.class, "View"}
-        );
+        return Collections.singleton(new Object[]{HugeGraphFactory.class, "Huge"});
+//        return Arrays.asList(
+//                new Object[]{HeavyGraphFactory.class, "Heavy"},
+//                new Object[]{LightGraphFactory.class, "Light"},
+//                new Object[]{HugeGraphFactory.class, "Huge"},
+//                new Object[]{GraphViewFactory.class, "View"}
+//        );
     }
 
     private int a, b, c, d;
@@ -70,14 +74,14 @@ public class KMeansTest {
 
     private Graph graph;
 
-    public KMeansTest(
+    public KSpanningTreeTest(
             Class<? extends GraphFactory> graphImpl,
             String nameIgnoredOnlyForTestName) {
         graph = new GraphLoader(DB)
                 .withRelationshipWeightsFromProperty("w", 1.0)
                 .withAnyRelationshipType()
                 .withAnyLabel()
-                .withDirection(Direction.BOTH)
+                .asUndirected(true)
                 .load(graphImpl);
 
         try (Transaction tx = DB.beginTx()) {
@@ -91,12 +95,33 @@ public class KMeansTest {
     }
 
     @Test
-    public void test() throws Exception {
-        final DisjointSetStruct setStruct = new KMeans(graph, 2)
-                .compute(a)
-                .getSetStruct();
+    public void testMaximumKSpanningTree() throws Exception {
+        final KSpanningTree kSpanningTree = new KSpanningTree(graph)
+                .compute(a, 2, true);
 
-        System.out.println(setStruct);
+        print(kSpanningTree);
+
+
+    }
+
+    private void print(KSpanningTree kSpanningTree) {
+        kSpanningTree.getRoots().forEach((IntProcedure) root -> {
+            System.out.print("(" +  root + ") : ");
+            kSpanningTree.getUndirectedTree().forEachDFS(root, (s, t, r) -> {
+                System.out.print(s + " -> " + t + " ");
+                return true;
+            });
+        });
+        System.out.println();
+    }
+
+
+    @Test
+    public void testMinimumKSpanningTree() throws Exception {
+        final KSpanningTree kSpanningTree = new KSpanningTree(graph)
+                .compute(a, 2, false);
+
+        print(kSpanningTree);
     }
 
 }
