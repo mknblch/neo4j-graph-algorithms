@@ -61,35 +61,21 @@ public abstract class SharedIntPriorityQueue extends IntPriorityQueue {
         // does nothing, costs should be managed outside of this queue
     }
 
-    public static final class Min extends SharedIntPriorityQueue {
-
-        /**
-         * @see SharedIntPriorityQueue#SharedIntPriorityQueue(int, IntDoubleMap, double)
-         */
-        public Min(int initialCapacity, IntDoubleMap costs, double defaultCost) {
-            super(initialCapacity, costs, defaultCost);
-        }
-
-        @Override
-        protected boolean lessThan(int a, int b) {
-            return costs.getOrDefault(a, defaultCost) < costs.getOrDefault(b, defaultCost);
-        }
-
+    public static SharedIntPriorityQueue min(int capacity, IntDoubleMap costs, double defaultCost) {
+        return new SharedIntPriorityQueue(capacity, costs, defaultCost) {
+            @Override
+            protected boolean lessThan(int a, int b) {
+                return costs.get(a) < costs.get(b);
+            }
+        };
     }
 
-    public static final class Max extends SharedIntPriorityQueue {
-
-        /**
-         * @see SharedIntPriorityQueue#SharedIntPriorityQueue(int, IntDoubleMap, double)
-         */
-        public Max(int initialCapacity, IntDoubleMap costs, double defaultCost) {
-            super(initialCapacity, costs, defaultCost);
-        }
-
-        @Override
-        protected boolean lessThan(int a, int b) {
-            return costs.getOrDefault(a, defaultCost) > costs.getOrDefault(b, defaultCost);
-        }
-
+    public static SharedIntPriorityQueue max(int capacity, IntDoubleMap costs, double defaultCost) {
+        return new SharedIntPriorityQueue(capacity, costs, defaultCost) {
+            @Override
+            protected boolean lessThan(int a, int b) {
+                return costs.get(a) > costs.get(b);
+            }
+        };
     }
 }

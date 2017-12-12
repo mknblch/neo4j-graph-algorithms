@@ -62,7 +62,7 @@ public class ShortestPathDijkstra extends Algorithm<ShortestPathDijkstra> {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
         costs = new IntDoubleScatterMap(nodeCount);
-        queue = new SharedIntPriorityQueue.Min(
+        queue = SharedIntPriorityQueue.min(
                 nodeCount,
                 costs,
                 Double.MAX_VALUE);

@@ -72,7 +72,7 @@ public class Prim extends Algorithm<Prim> {
     private SpanningTree prim(int startNode, boolean max) {
         final SpanningTree spanningTree = new SpanningTree(nodeCount);
         final IntDoubleMap cost = new IntDoubleScatterMap(nodeCount);
-        final SharedIntPriorityQueue queue = new SharedIntPriorityQueue.Min(
+        final SharedIntPriorityQueue queue = SharedIntPriorityQueue.min(
                 nodeCount,
                 cost,
                 Double.MAX_VALUE);
