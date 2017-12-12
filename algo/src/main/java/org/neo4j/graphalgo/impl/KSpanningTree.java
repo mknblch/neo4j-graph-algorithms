@@ -58,7 +58,7 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
     public KSpanningTree compute(int startNode, int k, boolean max) {
 
         final LongPriorityQueue priorityQueue;
-        final Prim prim = new Prim(graph);
+        final Prim prim = new Prim(graph, graph, graph);
         undirectedTree = new UndirectedTree(nodeCount);
         if (max) {
             prim.computeMaximumSpanningTree(startNode);

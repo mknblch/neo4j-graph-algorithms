@@ -45,14 +45,18 @@ import java.util.Arrays;
  */
 public class Prim extends Algorithm<Prim> {
 
-    private final Graph graph;
+    private final IdMapping idMapping;
+    private final RelationshipIterator relationshipIterator;
+    private final RelationshipWeights weights;
     private final int nodeCount;
 
     private SpanningTree spanningTree;
 
-    public Prim(Graph graph) {
-        this.graph = graph;
-        nodeCount = Math.toIntExact(graph.nodeCount());
+    public Prim(IdMapping idMapping, RelationshipIterator relationshipIterator, RelationshipWeights weights) {
+        this.idMapping = idMapping;
+        this.relationshipIterator = relationshipIterator;
+        this.weights = weights;
+        nodeCount = Math.toIntExact(idMapping.nodeCount());
     }
 
     public Prim computeMaximumSpanningTree(int startNode) {
@@ -84,12 +88,12 @@ public class Prim extends Algorithm<Prim> {
             }
             effectiveNodeCount++;
             visited.put(node);
-            graph.forEachRelationship(node, Direction.OUTGOING, (s, t, r) -> {
+            relationshipIterator.forEachRelationship(node, Direction.OUTGOING, (s, t, r) -> {
                 if (visited.contains(t)) {
                     return true;
                 }
                 // invert weight to calculate maximum
-                final double w = max ? -graph.weightOf(s, t) : graph.weightOf(s, t);
+                final double w = max ? -weights.weightOf(s, t) : weights.weightOf(s, t);
                 if (w < cost.getOrDefault(t, Double.MAX_VALUE)) {
                     cost.put(t, w);
                     queue.add(t, -1.0);
