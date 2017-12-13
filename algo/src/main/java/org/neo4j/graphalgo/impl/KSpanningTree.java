@@ -52,11 +52,9 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
     private final IdMapping idMapping;
     private final RelationshipIterator relationshipIterator;
     private final RelationshipWeights weights;
-
     private final int nodeCount;
 
     private DisjointSetStruct setStruct;
-
 
     public KSpanningTree(IdMapping idMapping, RelationshipIterator relationshipIterator, RelationshipWeights weights) {
         this.idMapping = idMapping;
@@ -65,46 +63,29 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
         nodeCount = Math.toIntExact(idMapping.nodeCount());
     }
 
-    private static void print(int[] parents) {
-        for (int i = 0; i < parents.length; i++) {
-            System.out.printf("%2d ", parents[i]);
-        }
-        System.out.println();
-        for (int i = 0; i < parents.length; i++) {
-            System.out.printf("%2d ", i);
-        }
-        System.out.println("\n");
-    }
-
-
     public KSpanningTree compute(int startNode, int k, boolean max) {
 
-
-        System.out.println(max ? "max" : "min");
+        final Prim prim = new Prim(idMapping, relationshipIterator, weights);
 
         final IntPriorityQueue priorityQueue;
         if (max) {
+            prim.computeMaximumSpanningTree(startNode);
             priorityQueue = IntPriorityQueue.min();
         } else {
+            prim.computeMinimumSpanningTree(startNode);
             priorityQueue = IntPriorityQueue.max();
         }
-        final int[] parents = prim(startNode, max, priorityQueue);
-
-        print(parents);
-
-        final PrimitiveIntIterator iterator = priorityQueue.iterator();
-        for (;iterator.hasNext();) {
-            final int cut = iterator.next();
-            System.out.println("cutti " + cut);
-        }
-
+        prim.getSpanningTree().forEach((s, t, r) -> {
+            priorityQueue.add(t, weights.weightOf(s, t));
+            return true;
+        });
+        final int[] parents = prim.getSpanningTree().parent;
         // remove top k-1 relationships
         for (int i = 0; i < k - 1; i++) {
             final int cutNode = priorityQueue.pop();
-            System.out.println("cutNode = " + cutNode);
             parents[cutNode] = -1;
         }
-
+        // eval disjoint sets
         setStruct = new DisjointSetStruct(nodeCount).reset();
         for (int i = 0; i < nodeCount; i++) {
             final int parent = parents[i];
@@ -115,47 +96,6 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
         }
 
         return this;
-    }
-
-    private int[] prim(int startNode, boolean max, IntPriorityQueue priorityQueue) {
-        final int[] parent = new int[nodeCount];
-        Arrays.fill(parent, -1);
-        final IntDoubleMap cost = new IntDoubleScatterMap(nodeCount);
-        final SharedIntPriorityQueue queue = SharedIntPriorityQueue.min(
-                nodeCount,
-                cost,
-                Double.MAX_VALUE);
-        final ProgressLogger logger = getProgressLogger();
-        final SimpleBitSet visited = new SimpleBitSet(nodeCount);
-        cost.put(startNode, 0.0);
-        queue.add(startNode, -1.0);
-        int effectiveNodeCount = 0;
-        while (!queue.isEmpty() && running()) {
-            final int node = queue.pop();
-            if (visited.contains(node)) {
-                continue;
-            }
-            effectiveNodeCount++;
-            visited.put(node);
-            relationshipIterator.forEachRelationship(node, Direction.OUTGOING, (s, t, r) -> {
-                if (visited.contains(t)) {
-                    return true;
-                }
-                // invert weight to calculate maximum
-                final double w = weights.weightOf(s, t);
-                final double v = max ? -w : w;
-                if (v < cost.getOrDefault(t, Double.MAX_VALUE)) {
-                    cost.put(t, v);
-                    queue.add(t, -1.0);
-                    parent[t] = s;
-                    priorityQueue.add(Math.max(s, t), w);
-                }
-                return true;
-            });
-            logger.logProgress(nodeCount - 1, effectiveNodeCount);
-        }
-        logger.logDone(() -> "Prim done");
-        return parent;
     }
 
     public DisjointSetStruct getSetStruct() {

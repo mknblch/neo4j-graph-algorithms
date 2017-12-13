@@ -8,15 +8,22 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphFactory;
+import org.neo4j.graphalgo.api.RelationshipConsumer;
 import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.huge.HugeGraphFactory;
+import org.neo4j.graphalgo.core.utils.dss.DisjointSetStruct;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.kernel.api.exceptions.KernelException;
 import org.neo4j.test.rule.ImpermanentDatabaseRule;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  *          1
@@ -83,27 +90,23 @@ public class KSpanningTreeTest {
             d = graph.toMappedNodeId(DB.findNode(Label.label("Node"), "name", "d").getId());
             tx.success();
         };
-
     }
 
     @Test
     public void testMaximumKSpanningTree() throws Exception {
-        final KSpanningTree kSpanningTree = new KSpanningTree(graph, graph, graph)
-                .compute(a, 2, true);
-
-        print(kSpanningTree);
+        final DisjointSetStruct struct = new KSpanningTree(graph, graph, graph)
+                .compute(a, 2, true)
+                .getSetStruct();
+        assertTrue(struct.connected(a, b));
+        assertTrue(struct.connected(c, d));
     }
 
     @Test
     public void testMinimumKSpanningTree() throws Exception {
-        final KSpanningTree kSpanningTree = new KSpanningTree(graph, graph, graph)
-                .compute(a, 2, false);
-
-        print(kSpanningTree);
+        final DisjointSetStruct struct = new KSpanningTree(graph, graph, graph)
+                .compute(a, 2, false)
+                .getSetStruct();
+        assertTrue(struct.connected(a, d));
+        assertTrue(struct.connected(b, c));
     }
-
-    private void print(KSpanningTree kSpanningTree) {
-        System.out.println(kSpanningTree.getSetStruct());
-    }
-
 }
