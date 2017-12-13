@@ -74,7 +74,7 @@ public class KSpanningTreeProc {
             @Name(value = "relationshipType") String relationship,
             @Name(value = "weightProperty") String weightProperty,
             @Name(value = "startNodeId") long startNode,
-            @Name(value = "k") int k,
+            @Name(value = "k") long k,
             @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
 
         return spanningTree(label, relationship, weightProperty, startNode, k, config, true);
@@ -89,17 +89,17 @@ public class KSpanningTreeProc {
             @Name(value = "relationshipType") String relationship,
             @Name(value = "weightProperty") String weightProperty,
             @Name(value = "startNodeId") long startNode,
-            @Name(value = "k") int k,
+            @Name(value = "k") long k,
             @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
 
-        return spanningTree(label, relationship, weightProperty, startNode, k, config, true);
+        return spanningTree(label, relationship, weightProperty, startNode, k, config, false);
     }
 
     public Stream<Prim.Result> spanningTree(String label,
                                             String relationship,
                                             String weightProperty,
                                             long startNode,
-                                            int k,
+                                            long k,
                                             Map<String, Object> config,
                                             boolean max) {
 
@@ -121,26 +121,28 @@ public class KSpanningTreeProc {
         final KSpanningTree kSpanningTree = new KSpanningTree(graph, graph, graph);
 
         builder.timeEval(() -> {
-            kSpanningTree.compute(root, k, max);
+            kSpanningTree.compute(root, (int)k, max);
         });
 
-        try (ProgressTimer timer = builder.timeWrite()) {
-            final DisjointSetStruct struct = kSpanningTree.getSetStruct();
+        if (configuration.isWriteFlag()) {
+            try (ProgressTimer timer = builder.timeWrite()) {
+                final DisjointSetStruct struct = kSpanningTree.getSetStruct();
 
-            final Exporter exporter = Exporter.of(api, graph)
-                    .withLog(log)
-                    .parallel(
-                            Pools.DEFAULT,
-                            configuration.getConcurrency(),
-                            TerminationFlag.wrap(transaction))
-                    .build();
+                final Exporter exporter = Exporter.of(api, graph)
+                        .withLog(log)
+                        .parallel(
+                                Pools.DEFAULT,
+                                configuration.getConcurrency(),
+                                TerminationFlag.wrap(transaction))
+                        .build();
 
-            exporter.write(
-                    configuration.get(
-                            CONFIG_CLUSTER_PROPERTY,
-                            DEFAULT_CLUSTER_PROPERTY),
-                    struct,
-                    DisjointSetStructTranslator.INSTANCE);
+                exporter.write(
+                        configuration.get(
+                                CONFIG_CLUSTER_PROPERTY,
+                                DEFAULT_CLUSTER_PROPERTY),
+                        struct,
+                        DisjointSetStructTranslator.INSTANCE);
+            }
         }
 
         return Stream.of(builder.build());

@@ -55,6 +55,7 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
     private final int nodeCount;
 
     private DisjointSetStruct setStruct;
+    private int effectiveNodeCount = -1;
 
     public KSpanningTree(IdMapping idMapping, RelationshipIterator relationshipIterator, RelationshipWeights weights) {
         this.idMapping = idMapping;
@@ -65,6 +66,7 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
 
     public KSpanningTree compute(int startNode, int k, boolean max) {
 
+        final ProgressLogger logger = getProgressLogger();
         final Prim prim = new Prim(idMapping, relationshipIterator, weights);
 
         final IntPriorityQueue priorityQueue;
@@ -75,24 +77,30 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
             prim.computeMinimumSpanningTree(startNode);
             priorityQueue = IntPriorityQueue.max();
         }
-        prim.getSpanningTree().forEach((s, t, r) -> {
-            priorityQueue.add(t, weights.weightOf(s, t));
-            return true;
-        });
-        final int[] parents = prim.getSpanningTree().parent;
+        effectiveNodeCount = prim.getSpanningTree().getEffectiveNodeCount();
+        final int[] parent = prim.getSpanningTree().parent;
+        for (int i = 0; i < parent.length && running(); i++) {
+            final int p = parent[i];
+            if (p == -1) {
+                continue;
+            }
+            priorityQueue.add(p, weights.weightOf(p, i));
+            logger.logProgress(i, nodeCount, () -> "reorganization");
+        }
         // remove top k-1 relationships
-        for (int i = 0; i < k - 1; i++) {
+        for (int i = 0; i < k - 1 && running(); i++) {
             final int cutNode = priorityQueue.pop();
-            parents[cutNode] = -1;
+            parent[cutNode] = -1;
         }
         // eval disjoint sets
         setStruct = new DisjointSetStruct(nodeCount).reset();
-        for (int i = 0; i < nodeCount; i++) {
-            final int parent = parents[i];
-            if (parent == -1) {
+        for (int i = 0; i < nodeCount && running(); i++) {
+            final int p = parent[i];
+            if (p == -1) {
                 continue;
             }
-            setStruct.union(parent, i);
+            setStruct.union(p, i);
+            logger.logProgress(i, nodeCount, () -> "grouping");
         }
 
         return this;
