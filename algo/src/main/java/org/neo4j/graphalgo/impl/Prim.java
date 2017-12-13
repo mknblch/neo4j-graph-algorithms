@@ -99,7 +99,7 @@ public class Prim extends Algorithm<Prim> {
                 }
                 return true;
             });
-            logger.logProgress(nodeCount - 1, effectiveNodeCount);
+            logger.logProgress(effectiveNodeCount, nodeCount - 1);
         }
         spanningTree.effectiveNodeCount = effectiveNodeCount;
         logger.logDone(() -> "Prim done");
