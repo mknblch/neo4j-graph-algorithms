@@ -99,6 +99,7 @@ public class KSpanningTreeTest {
                 .getSetStruct();
         assertTrue(struct.connected(a, b));
         assertTrue(struct.connected(c, d));
+        assertFalse(struct.connected(a, c));
     }
 
     @Test
@@ -108,5 +109,6 @@ public class KSpanningTreeTest {
                 .getSetStruct();
         assertTrue(struct.connected(a, d));
         assertTrue(struct.connected(b, c));
+        assertFalse(struct.connected(a, b));
     }
 }

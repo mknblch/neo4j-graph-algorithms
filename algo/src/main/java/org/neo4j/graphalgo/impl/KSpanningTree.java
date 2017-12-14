@@ -84,7 +84,7 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
             if (p == -1) {
                 continue;
             }
-            priorityQueue.add(p, weights.weightOf(p, i));
+            priorityQueue.add(i, weights.weightOf(p, i));
             logger.logProgress(i, nodeCount, () -> "reorganization");
         }
         // remove top k-1 relationships
@@ -102,8 +102,11 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
             setStruct.union(p, i);
             logger.logProgress(i, nodeCount, () -> "grouping");
         }
-
         return this;
+    }
+
+    public int getEffectiveNodeCount() {
+        return effectiveNodeCount;
     }
 
     public DisjointSetStruct getSetStruct() {
