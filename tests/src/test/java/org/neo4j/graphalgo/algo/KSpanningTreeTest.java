@@ -18,25 +18,17 @@
  */
 package org.neo4j.graphalgo.algo;
 
-import com.carrotsearch.hppc.IntIntScatterMap;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.neo4j.graphalgo.KSpanningTreeProc;
-import org.neo4j.graphalgo.LouvainProc;
-import org.neo4j.graphalgo.impl.KSpanningTree;
-import org.neo4j.graphdb.QueryExecutionException;
-import org.neo4j.helpers.Exceptions;
+import org.neo4j.graphalgo.KSplitSpanningTreeProc;
 import org.neo4j.kernel.api.exceptions.KernelException;
 import org.neo4j.kernel.impl.proc.Procedures;
 import org.neo4j.test.rule.ImpermanentDatabaseRule;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -67,7 +59,7 @@ public class KSpanningTreeTest {
                         " (b)-[:TYPE {w:1.0}]->(c),\n" +
                         " (d)-[:TYPE {w:3.0}]->(c)";
 
-        DB.resolveDependency(Procedures.class).registerProcedure(KSpanningTreeProc.class);
+        DB.resolveDependency(Procedures.class).registerProcedure(KSplitSpanningTreeProc.class);
         DB.execute(cypher);
     }
 

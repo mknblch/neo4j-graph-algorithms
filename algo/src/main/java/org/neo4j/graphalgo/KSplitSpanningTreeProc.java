@@ -50,7 +50,7 @@ import java.util.stream.Stream;
 /**
  * @author mknblch
  */
-public class KSpanningTreeProc {
+public class KSplitSpanningTreeProc {
 
     private static final String CONFIG_CLUSTER_PROPERTY = "partitionProperty";
     private static final String DEFAULT_CLUSTER_PROPERTY = "partition";
@@ -122,6 +122,7 @@ public class KSpanningTreeProc {
 
         builder.timeEval(() -> {
             kSpanningTree.compute(root, (int)k, max);
+            builder.withEffectiveNodeCount(kSpanningTree.getEffectiveNodeCount());
         });
 
         if (configuration.isWriteFlag()) {

@@ -30,6 +30,7 @@ import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
 import org.neo4j.graphalgo.core.utils.dss.DisjointSetStruct;
 import org.neo4j.graphalgo.core.utils.queue.*;
 import org.neo4j.graphalgo.core.utils.traverse.SimpleBitSet;
+import org.neo4j.graphalgo.results.AbstractResultBuilder;
 import org.neo4j.graphdb.Direction;
 
 import java.util.Arrays;
@@ -49,9 +50,9 @@ import java.util.Arrays;
  */
 public class KSpanningTree extends Algorithm<KSpanningTree> {
 
-    private final IdMapping idMapping;
-    private final RelationshipIterator relationshipIterator;
-    private final RelationshipWeights weights;
+    private IdMapping idMapping;
+    private RelationshipIterator relationshipIterator;
+    private RelationshipWeights weights;
     private final int nodeCount;
 
     private DisjointSetStruct setStruct;
@@ -67,7 +68,9 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
     public KSpanningTree compute(int startNode, int k, boolean max) {
 
         final ProgressLogger logger = getProgressLogger();
-        final Prim prim = new Prim(idMapping, relationshipIterator, weights);
+        final Prim prim = new Prim(idMapping, relationshipIterator, weights)
+                .withProgressLogger(getProgressLogger())
+                .withTerminationFlag(getTerminationFlag());
 
         final IntPriorityQueue priorityQueue;
         if (max) {
@@ -120,7 +123,45 @@ public class KSpanningTree extends Algorithm<KSpanningTree> {
 
     @Override
     public KSpanningTree release() {
+        idMapping = null;
+        relationshipIterator = null;
+        weights = null;
+        setStruct = null;
         return this;
     }
 
+    public static class Result {
+
+        public final long loadMillis;
+        public final long computeMillis;
+        public final long writeMillis;
+        public final long effectiveNodeCount;
+
+        public Result(long loadMillis,
+                      long computeMillis,
+                      long writeMillis,
+                      int effectiveNodeCount) {
+            this.loadMillis = loadMillis;
+            this.computeMillis = computeMillis;
+            this.writeMillis = writeMillis;
+            this.effectiveNodeCount = effectiveNodeCount;
+        }
+    }
+
+    public static class Builder extends AbstractResultBuilder<Result> {
+
+        protected int effectiveNodeCount;
+
+        public Builder withEffectiveNodeCount(int effectiveNodeCount) {
+            this.effectiveNodeCount = effectiveNodeCount;
+            return this;
+        }
+
+        public Result build() {
+            return new Result(loadDuration,
+                    evalDuration,
+                    writeDuration,
+                    effectiveNodeCount);
+        }
+    }
 }
