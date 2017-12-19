@@ -18,6 +18,7 @@
  */
 package org.neo4j.graphalgo.core.utils;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.stream.IntStream;
 
@@ -68,6 +69,40 @@ public class AtomicDoubleArray {
             currentBits = data.get(index);
             newBits = Double.doubleToLongBits(Double.longBitsToDouble(currentBits) + value);
         } while (!data.compareAndSet(index, currentBits, newBits));
+    }
+
+    public boolean trySet(int index, double value) {
+        final long currentLong = data.get(index);
+        final long valueLong = Double.doubleToLongBits(value);
+        return data.compareAndSet(index, currentLong, valueLong);
+    }
+
+    public boolean trySetMin(int index, double value) {
+        final long valueL = Double.doubleToLongBits(value);
+        double currentD = data.get(index);
+        long currentL = data.get(index);
+        while (value < currentD) {
+            if (data.compareAndSet(index, currentL, valueL)) {
+                return true;
+            }
+            currentL = data.get(index);
+            currentD = Double.longBitsToDouble(currentL);
+        }
+        return false;
+    }
+
+    public void fill(double value) {
+        final long valueL = Double.doubleToLongBits(value);
+        final int length = data.length();
+        for (int i = 0; i < length; i++) {
+            set(i, value);
+        }
+    }
+
+    public void fill(double value, ExecutorService pool, int concurrency) {
+        final long valueL = Double.doubleToLongBits(value);
+        final int length = data.length();
+        ParallelUtil.iterateParallel(pool, length, concurrency, i -> data.set(i, valueL));
     }
 
     /**
