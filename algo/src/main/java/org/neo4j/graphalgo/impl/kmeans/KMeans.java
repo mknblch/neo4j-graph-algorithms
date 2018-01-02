@@ -34,8 +34,8 @@ public class KMeans extends Algorithm<KMeans> {
 
     private IntSet roots;
 
-    private int maxIterations = 10;
     private RootSelectionStrategy rootSelectionStrategy;
+    private int maxIterations = 10;
     private boolean convergence = false;
 
     public KMeans(Graph graph, AllocationTracker tracker, ExecutorService pool, int concurrency) {
@@ -57,13 +57,24 @@ public class KMeans extends Algorithm<KMeans> {
                 return this;
             }
             final IntSet newRoots = rootSelectionStrategy.roots(cluster, k);
-
+            if (!difference(roots, newRoots)) {
+                this.convergence = true;
+                return this;
+            }
         }
         return this;
     }
 
     private static boolean difference(IntSet a, IntSet b) {
-
+        if (a.size() != b.size()) {
+            return true;
+        }
+        for (IntCursor intCursor : b) {
+            if (!a.contains(intCursor.value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean cluster() {
