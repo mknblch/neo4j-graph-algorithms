@@ -5,9 +5,11 @@ import org.neo4j.graphalgo.api.RelationshipWeights;
 import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.ProcedureConfiguration;
 import org.neo4j.graphalgo.core.utils.DegreeNormalizedRelationshipWeights;
+import org.neo4j.graphalgo.core.utils.GraphNormalizedRelationshipWeights;
 import org.neo4j.graphalgo.core.utils.NormalizedRelationshipWeights;
 import org.neo4j.graphalgo.core.utils.Pools;
 import org.neo4j.graphalgo.impl.infomap.MapEquation;
+import org.neo4j.graphalgo.impl.infomap.SimplePageRank;
 import org.neo4j.graphalgo.impl.pagerank.PageRankAlgorithm;
 import org.neo4j.graphalgo.impl.pagerank.PageRankResult;
 import org.neo4j.graphdb.Direction;
@@ -51,13 +53,17 @@ public class MapEquationProc {
 
         final Graph graph = new GraphLoader(db, Pools.DEFAULT)
                 .init(log, config.getNodeLabelOrQuery(), config.getRelationshipOrQuery(), config)
+                .asUndirected(true)
                 .load(config.getGraphImpl());
 
-        final PageRankResult pageRankResult = PageRankAlgorithm.of(graph, 1. - MapEquation.TAU, LongStream.empty())
-                .compute(config.getNumber("pr_iterations", 10).intValue())
-                .result();
+        final SimplePageRank pageRank = new SimplePageRank(graph, 1. - MapEquation.TAU)
+                .compute(config.getNumber("pr_iterations", 10).intValue());
 
-        final int[] communities = new MapEquation(graph, pageRankResult::score, new DegreeNormalizedRelationshipWeights(graph))
+//        final PageRankResult pageRank = PageRankAlgorithm.of(graph, 1. - MapEquation.TAU, LongStream.empty())
+//                .compute(config.getNumber("pr_iterations", 10).intValue())
+//                .result();
+//
+        final int[] communities = new MapEquation(graph, pageRank, new DegreeNormalizedRelationshipWeights(graph))
                 .compute(config.getIterations(10), config.get("shuffle", true))
                 .getCommunities();
 
