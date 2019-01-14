@@ -26,23 +26,23 @@ import org.neo4j.procedure.Procedure;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-public class EuclideanProc extends SimilarityProc {
+public class PearsonProc extends SimilarityProc {
 
-    @Procedure(name = "algo.similarity.euclidean.stream", mode = Mode.READ)
-    @Description("CALL algo.similarity.euclidean.stream([{item:id, weights:[weights]}], {similarityCutoff:-1,degreeCutoff:0}) " +
-            "YIELD item1, item2, count1, count2, intersection, similarity - computes euclidean distance")
+    @Procedure(name = "algo.similarity.pearson.stream", mode = Mode.READ)
+    @Description("CALL algo.similarity.pearson.stream([{item:id, weights:[weights]}], {similarityCutoff:-1,degreeCutoff:0}) " +
+            "YIELD item1, item2, count1, count2, intersection, similarity - computes cosine distance")
     // todo count1,count2 = could be the non-null values, intersection the values where both are non-null?
-    public Stream<SimilarityResult> euclideanStream(
+    public Stream<SimilarityResult> pearsonStream(
             @Name(value = "data", defaultValue = "null") List<Map<String,Object>> data,
-            @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
+            @Name(value = "config", defaultValue = "{}") Map<String, Object> config) throws Exception {
         ProcedureConfiguration configuration = ProcedureConfiguration.create(config);
         Double skipValue = configuration.get("skipValue", null);
+
         SimilarityComputer<WeightedInput> computer = skipValue == null ?
-                (decoder, s, t, cutoff) -> s.sumSquareDelta(cutoff, t) :
-                (decoder, s, t, cutoff) -> s.sumSquareDeltaSkip(cutoff, t, skipValue);
+                (decoder, s,t,cutoff) -> s.pearsonSquares(cutoff, t) :
+                (decoder, s,t,cutoff) -> s.pearsonSquaresSkip(cutoff, t, skipValue);
 
         WeightedInput[] inputs = preparseDenseWeights(data, getDegreeCutoff(configuration), skipValue);
 
@@ -50,24 +50,25 @@ public class EuclideanProc extends SimilarityProc {
         // as we don't compute the sqrt until the end
         if (similarityCutoff > 0d) similarityCutoff *= similarityCutoff;
 
-        int topN = -getTopN(configuration);
-        int topK = -getTopK(configuration);
+        int topN = getTopN(configuration);
+        int topK = getTopK(configuration);
 
-        return topN(similarityStream(inputs, computer, configuration, () -> null, similarityCutoff, topK), topN)
-                .map(SimilarityResult::squareRooted);
+        Stream<SimilarityResult> stream = topN(similarityStream(inputs, computer, configuration, () -> null, similarityCutoff, topK), topN);
+
+        return stream.map(SimilarityResult::squareRooted);
     }
 
-    @Procedure(name = "algo.similarity.euclidean", mode = Mode.WRITE)
-    @Description("CALL algo.similarity.euclidean([{item:id, weights:[weights]}], {similarityCutoff:-1,degreeCutoff:0}) " +
-            "YIELD p50, p75, p90, p99, p999, p100 - computes euclidean similarities")
-    public Stream<SimilaritySummaryResult> euclidean(
+    @Procedure(name = "algo.similarity.pearson", mode = Mode.WRITE)
+    @Description("CALL algo.similarity.pearson([{item:id, weights:[weights]}], {similarityCutoff:-1,degreeCutoff:0}) " +
+            "YIELD p50, p75, p90, p99, p999, p100 - computes cosine similarities")
+    public Stream<SimilaritySummaryResult> pearson(
             @Name(value = "data", defaultValue = "null") List<Map<String, Object>> data,
             @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
         ProcedureConfiguration configuration = ProcedureConfiguration.create(config);
         Double skipValue = configuration.get("skipValue", null);
         SimilarityComputer<WeightedInput> computer = skipValue == null ?
-                (decoder, s, t, cutoff) -> s.sumSquareDelta(cutoff, t) :
-                (decoder, s, t, cutoff) -> s.sumSquareDeltaSkip(cutoff, t, skipValue);
+                (decoder,s,t,cutoff) -> s.pearsonSquares(cutoff, t) :
+                (decoder, s,t,cutoff) -> s.pearsonSquaresSkip(cutoff, t, skipValue);
 
         WeightedInput[] inputs = preparseDenseWeights(data, getDegreeCutoff(configuration), skipValue);
 
@@ -75,14 +76,14 @@ public class EuclideanProc extends SimilarityProc {
         // as we don't compute the sqrt until the end
         if (similarityCutoff > 0d) similarityCutoff *= similarityCutoff;
 
-        int topN = -getTopN(configuration);
-        int topK = -getTopK(configuration);
-
+        int topN = getTopN(configuration);
+        int topK = getTopK(configuration);
 
         Stream<SimilarityResult> stream = topN(similarityStream(inputs, computer, configuration, () -> null, similarityCutoff, topK), topN)
                 .map(SimilarityResult::squareRooted);
 
-        boolean write = configuration.isWriteFlag(false); //  && similarityCutoff != 0.0;
+
+        boolean write = configuration.isWriteFlag(false) && similarityCutoff > 0.0;
         return writeAndAggregateResults(configuration, stream, inputs.length, write, "SIMILAR");
     }
 
