@@ -21,51 +21,34 @@ package org.neo4j.graphalgo.results;
 /**
  * @author mknblch
  */
-public class LouvainResult {
+public class LouvainResult extends CommunityResult {
 
-    public final long loadMillis;
-    public final long computeMillis;
-    public final long writeMillis;
-    public final long nodes;
-    public final long iterations;
-    public final long communityCount;
-
-    private LouvainResult(long loadMillis, long computeMillis, long writeMillis, long nodes, long iterations, long communityCount) {
-        this.loadMillis = loadMillis;
-        this.computeMillis = computeMillis;
-        this.writeMillis = writeMillis;
-        this.nodes = nodes;
-        this.iterations = iterations;
-        this.communityCount = communityCount;
+    private LouvainResult(long loadMillis, long computeMillis, long writeMillis, long nodes, long communityCount, long iterations, boolean convergence, long p99, long p95, long p90, long p75, long p50, int[] biggestCommunities) {
+        super(loadMillis, computeMillis, writeMillis, nodes, communityCount, iterations, convergence, p99, p95, p90, p75, p50, biggestCommunities);
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
-    public static class Builder extends AbstractResultBuilder<LouvainResult> {
+    public static class Builder extends CommunityResult.AbstractCommunityBuilder<LouvainResult> {
 
-        private long nodes = 0;
-        private long communityCount = 0;
-        private long iterations = 1;
-
-        public Builder withIterations(long iterations) {
-            this.iterations = iterations;
-            return this;
-        }
-
-        public Builder withCommunityCount(long setCount) {
-            this.communityCount = setCount;
-            return this;
-        }
-
-        public Builder withNodeCount(long nodes) {
-            this.nodes = nodes;
-            return this;
-        }
-
+        @Override
         public LouvainResult build() {
-            return new LouvainResult(loadDuration, evalDuration, writeDuration, nodes, iterations, communityCount);
+            return new LouvainResult(
+                    loadDuration,
+                    evalDuration,
+                    writeDuration,
+                    nodes,
+                    communityCount == -1 ? communityMap.size() : communityCount,
+                    iterations, convergence,
+                    histogram.getValueAtPercentile(.99),
+                    histogram.getValueAtPercentile(.95),
+                    histogram.getValueAtPercentile(.90),
+                    histogram.getValueAtPercentile(.75),
+                    histogram.getValueAtPercentile(.50),
+                    getTopN(3));
         }
     }
+
 }
