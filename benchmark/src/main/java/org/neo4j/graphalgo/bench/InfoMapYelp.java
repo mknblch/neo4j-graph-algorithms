@@ -21,7 +21,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import java.util.concurrent.TimeUnit;
 
 @Threads(1)
-@Fork(value = 1, jvmArgs = {"-Xms4g", "-Xmx8g", "-XX:+UseG1GC"})
+@Fork(value = 1, jvmArgs = {"-ea", "-Xms4g", "-Xmx8g", "-XX:+UseG1GC"})
 @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 2, timeUnit = TimeUnit.SECONDS)
 @BenchmarkMode(Mode.AverageTime)
