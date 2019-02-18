@@ -82,6 +82,10 @@ public class Louvain extends Algorithm<Louvain> {
     }
 
     public Louvain compute(int maxLevel, int maxIterations) {
+        return compute(maxLevel, maxIterations, false);
+    }
+
+    public Louvain compute(int maxLevel, int maxIterations, boolean rnd) {
         // temporary graph
         Graph graph = this.root;
         // result arrays
@@ -94,9 +98,10 @@ public class Louvain extends Algorithm<Louvain> {
                             nodeId -> nodeWeights[nodeId],
                             pool,
                             concurrency,
-                            tracker)
+                            tracker, System.currentTimeMillis())
                             .withProgressLogger(progressLogger)
                             .withTerminationFlag(terminationFlag)
+                            .withRandomNeighborOptimization(rnd)
                             .compute(maxIterations);
             // rebuild graph based on the community structure
             final int[] communityIds = modularityOptimization.getCommunityIds();
@@ -118,7 +123,7 @@ public class Louvain extends Algorithm<Louvain> {
         return this;
     }
 
-    public Louvain compute(WeightMapping communityMap, int maxLevel, int maxIterations) {
+    public Louvain compute(WeightMapping communityMap, int maxLevel, int maxIterations, boolean rnd) {
         BitSet comCount = new BitSet();
         Arrays.setAll(communities, i -> {
             final int t = (int) communityMap.get(i, -1.0);
@@ -140,9 +145,10 @@ public class Louvain extends Algorithm<Louvain> {
                             nodeId -> nodeWeights[nodeId],
                             pool,
                             concurrency,
-                            tracker)
+                            tracker, System.currentTimeMillis())
                             .withProgressLogger(progressLogger)
                             .withTerminationFlag(terminationFlag)
+                            .withRandomNeighborOptimization(rnd)
                             .compute(maxIterations);
             // rebuild graph based on the community structure
             final int[] communityIds = modularityOptimization.getCommunityIds();

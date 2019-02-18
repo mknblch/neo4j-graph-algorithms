@@ -143,4 +143,21 @@ public class LouvainMultiLevelTest {
         assertArrayEquals(new int[]{0, 0, 0, 1, 1, 1, 2, 2, 2}, dendogram[0]);
         assertArrayEquals(new int[]{0, 0, 0, 1, 1, 1, 2, 2, 2}, algorithm.getCommunityIds());
     }
+
+    @Test
+    public void testComplexRNL() throws Exception {
+        setup(COMPLEX_CYPHER);
+        final Louvain algorithm = new Louvain(graph, Pools.DEFAULT, 1, AllocationTracker.EMPTY)
+                .withProgressLogger(TestProgressLogger.INSTANCE)
+                .withTerminationFlag(TerminationFlag.RUNNING_TRUE)
+                .compute(10, 10, true);
+        final int[][] dendogram = algorithm.getDendrogram();
+        for (int i = 1; i <= dendogram.length; i++) {
+            if (null == dendogram[i - 1]) {
+                break;
+            }
+            System.out.println("level " + i + ": " + Arrays.toString(dendogram[i - 1]));
+        }
+
+    }
 }
