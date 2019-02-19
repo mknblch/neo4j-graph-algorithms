@@ -188,12 +188,20 @@ public class InfoMap extends Algorithm<InfoMap> {
      */
     public InfoMap compute() {
         this.iterations = 0;
-        long ts = System.currentTimeMillis();
+        final long start = System.currentTimeMillis();
+        long ts = start;
         while (terminationFlag.running() && optimize()) {
             this.iterations++;
-            final long start = ts;
+            final long iterStart = ts;
             final long c = System.currentTimeMillis();
-            logger.logProgress(iterations / (double) nodeCount, () -> "Iteration " + iterations + " took " + (c - start) + "ms");
+            logger.logProgress(iterations / (double) nodeCount, () -> String.format(
+                    "Iteration %d took %dms, overall %,dms, ETA at %,d iterations: %,dms",
+                    iterations,
+                    c - iterStart,
+                    c - start,
+                    nodeCount,
+                    (long) ((double) (c - start) / iterations * (nodeCount - iterations))
+            ));
             ts = c;
         }
         return this;
