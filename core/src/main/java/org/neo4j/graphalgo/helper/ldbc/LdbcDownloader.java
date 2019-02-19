@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.graphalgo.bench;
+package org.neo4j.graphalgo.helper.ldbc;
 
 import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.compress.archivers.ArchiveStreamFactory;
@@ -42,6 +42,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import static org.neo4j.kernel.configuration.Settings.BOOLEAN;
@@ -186,12 +188,19 @@ public final class LdbcDownloader {
         }
     }
 
+
+    private static final Pattern REPLACE_SUFFIX = Pattern.compile("\\.tgz(?:.+)?", Pattern.CASE_INSENSITIVE);
+
     private static Path unGzip(Path inputFile, S3Location location) throws IOException {
         String fileName = inputFile.getFileName().toString();
+        Matcher matcher = REPLACE_SUFFIX.matcher(fileName);
+        String targetFileName = matcher.replaceAll(".tar");
+
+        System.out.println("fileName = " + targetFileName);
         assert fileName.endsWith(".tgz");
         Path targetFile = inputFile
                 .getParent()
-                .resolve(fileName.replace(".tgz", ".tar"));
+                .resolve(targetFileName);
 
         try (InputStream in = Files.newInputStream(inputFile);
              GZIPInputStream gzipIn = new GZIPInputStream(in);

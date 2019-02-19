@@ -19,35 +19,18 @@
 package org.neo4j.graphalgo.algo;
 
 import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Test;
-import org.neo4j.graphalgo.GetNodeFunc;
 import org.neo4j.graphalgo.InfoMapProc;
-import org.neo4j.graphalgo.LabelPropagationProc;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.bench.LdbcDownloader;
-import org.neo4j.graphalgo.impl.infomap.InfoMap;
+import org.neo4j.graphalgo.helper.ldbc.LdbcDownloader;
 import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.factory.GraphDatabaseFactory;
-import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.internal.kernel.api.exceptions.KernelException;
 import org.neo4j.kernel.impl.proc.Procedures;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
-import org.neo4j.test.TestGraphDatabaseFactory;
-import org.neo4j.test.rule.ImpermanentDatabaseRule;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
-
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.*;
 
 /**
- *
  * @author mknblch
  */
 public class InfoMapYelpTest {
