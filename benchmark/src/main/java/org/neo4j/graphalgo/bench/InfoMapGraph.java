@@ -34,7 +34,7 @@ public class InfoMapGraph {
     ProgressLogger progressLogger;
     NodeWeights pageRanks;
 
-    final int concurrency = 2; // Pools.DEFAULT_CONCURRENCY;
+    final int concurrency = 2;
     final double tau = 0.3;
     final int iterations = 15;
     final double threshold = 0.01;
@@ -53,13 +53,8 @@ public class InfoMapGraph {
                 .withLogInterval(1L, TimeUnit.SECONDS)
                 .asUndirected(true)
                 .withAnyLabel()
-//                .withNodeStatement("MATCH (c:Category) RETURN id(c) AS id")
                 .withAnyRelationshipType()
-//                .withRelationshipStatement("MATCH (c1:Category)<-[:IN_CATEGORY]-()-[:IN_CATEGORY]->(c2:Category)\n" +
-//                        "   WHERE id(c1) < id(c2)\n" +
-//                        "   RETURN id(c1) AS source, id(c2) AS target")
                 .load(HeavyGraphFactory.class);
-//                .load(HeavyCypherGraphFactory.class);
 
 
         PageRankResult pr = PageRankAlgorithm.of(
