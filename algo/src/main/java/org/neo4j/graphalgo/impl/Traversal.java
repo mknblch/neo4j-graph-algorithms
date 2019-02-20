@@ -1,5 +1,3 @@
-package org.neo4j.graphalgo.impl;
-
 /**
  * Copyright (c) 2017 "Neo4j, Inc." <http://neo4j.com>
  * <p>
@@ -18,10 +16,10 @@ package org.neo4j.graphalgo.impl;
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.neo4j.graphalgo.impl;
 
 import com.carrotsearch.hppc.BitSet;
 import com.carrotsearch.hppc.IntArrayDeque;
-import com.carrotsearch.hppc.IntStack;
 import com.carrotsearch.hppc.LongArrayList;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.impl.walking.WalkPath;
@@ -31,20 +29,20 @@ import org.neo4j.graphdb.Path;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 
+import java.util.function.ObjIntConsumer;
+
 /**
  * @author mknblch
  */
-public class BFS extends Algorithm<BFS> {
+public class Traversal extends Algorithm<Traversal> {
 
     private final int nodeCount;
-    private final GraphDatabaseAPI api;
     private Graph graph;
     private IntArrayDeque nodes;
     private IntArrayDeque depths;
     private BitSet visited;
 
-    public BFS(GraphDatabaseAPI api, Graph graph) {
-        this.api = api;
+    public Traversal(Graph graph) {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
         nodes = new IntArrayDeque(nodeCount);
@@ -52,25 +50,12 @@ public class BFS extends Algorithm<BFS> {
         visited = new BitSet(nodeCount);
     }
 
-    public WalkResult computeToTarget(int source, Direction direction, int target) {
-        return toWalkResult(bfs(source, direction, target, Integer.MAX_VALUE, Integer.MAX_VALUE));
+    public long[] computeBfs(int source, Direction direction, int target, int maxDepth) {
+        return traverse(source, direction, target, maxDepth, IntArrayDeque::addLast);
     }
 
-    public WalkResult computeMaxDepth(int source, Direction direction, int maxDepth) {
-        return toWalkResult(bfs(source, direction, -1, maxDepth, Integer.MAX_VALUE));
-    }
-
-    public WalkResult computeMaxVisits(int source, Direction direction, int maxVisits) {
-        return toWalkResult(bfs(source, direction, -1, Integer.MAX_VALUE, maxVisits));
-    }
-
-    private WalkResult toWalkResult(long[] nodes) {
-        try (Transaction transaction = api.beginTx()) {
-            final Path path = WalkPath.toPath(api, nodes);
-            final WalkResult result = new WalkResult(nodes, path);
-            transaction.success();
-            return result;
-        }
+    public long[] computeDfs(int source, Direction direction, int target, int maxDepth) {
+        return traverse(source, direction, target, maxDepth, IntArrayDeque::addFirst);
     }
 
     /**
@@ -78,40 +63,31 @@ public class BFS extends Algorithm<BFS> {
      *
      * @return true if a path has been found, false otherwise
      */
-    private long[] bfs(int source, Direction direction, int target, int maxDepth, int maxVisits) {
-
+    private long[] traverse(int source, Direction direction, int target, int maxDepth, ObjIntConsumer<IntArrayDeque> pusher) {
         final LongArrayList list = new LongArrayList(nodeCount);
-        final int[] visits = {0};
-
         nodes.clear();
         depths.clear();
         visited.clear();
-        nodes.addLast(source);
-        depths.addLast(0);
+        pusher.accept(nodes, source);
+        pusher.accept(depths, 0);
         visited.set(source);
-
         while (!nodes.isEmpty() && running()) {
-            visits[0]++;
             final int node = nodes.removeFirst();
             final int depth = depths.removeFirst();
             list.add(graph.toOriginalNodeId(node));
             if (target == node) {
                 break;
             }
-            if (visits[0] >= maxVisits) {
-                break;
-            }
             if (depth >= maxDepth) {
                 break;
             }
-
             graph.forEachRelationship(
                     node,
                     direction, (s, t, relId) -> {
                         if (!visited.get(t)) {
                             visited.set(t);
-                            nodes.addLast(t);
-                            depths.addLast(depth + 1);
+                            pusher.accept(nodes, t);
+                            pusher.accept(depths, depth + 1);
                         }
                         return running();
                     });
@@ -119,17 +95,25 @@ public class BFS extends Algorithm<BFS> {
         return list.toArray();
     }
 
-
     @Override
-    public BFS me() {
+    public Traversal me() {
         return this;
     }
 
     @Override
-    public BFS release() {
+    public Traversal release() {
         nodes = null;
         depths = null;
         visited = null;
         return this;
+    }
+
+    public static WalkResult toWalkResult(GraphDatabaseAPI api, long[] nodes) {
+        try (Transaction transaction = api.beginTx()) {
+            final Path path = WalkPath.toPath(api, nodes);
+            final WalkResult result = new WalkResult(nodes, path);
+            transaction.success();
+            return result;
+        }
     }
 }

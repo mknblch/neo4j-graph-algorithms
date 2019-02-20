@@ -18,39 +18,31 @@
  */
 package org.neo4j.graphalgo.impl;
 
-import com.carrotsearch.hppc.LongArrayList;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.heavyweight.HeavyGraphFactory;
-import org.neo4j.graphalgo.core.utils.RawValues;
 import org.neo4j.graphalgo.impl.walking.WalkResult;
-import org.neo4j.graphalgo.impl.yens.Dijkstra;
-import org.neo4j.graphalgo.impl.yens.WeightedPath;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Node;
 import org.neo4j.internal.kernel.api.exceptions.KernelException;
 import org.neo4j.test.rule.ImpermanentDatabaseRule;
 
-import static org.junit.Assert.*;
-
 /**
- * Test for specialized dijkstra implementation with filters & maxDepth
- *
  *
  * Graph:
  *
  *     (b)   (e)
- *   2/ 1\ 2/ 1\
- * >(a)  (d)  ((g))
- *   1\ 2/ 1\ 2/
+ *    /  \  /  \
+ * >(a)  (d)   (g)
+ *    \  /  \  /
  *    (c)   (f)
  *
  * @author mknblch
  */
-public class BFSTest {
+public class TraversalTest {
 
     @ClassRule
     public static ImpermanentDatabaseRule db = new ImpermanentDatabaseRule();
@@ -69,14 +61,14 @@ public class BFSTest {
                         "CREATE (f:Node {name:'f'})\n" +
                         "CREATE (g:Node {name:'g'})\n" +
                         "CREATE" +
-                        " (a)-[:TYPE {cost:2.0}]->(b),\n" +
-                        " (a)-[:TYPE {cost:1.0}]->(c),\n" +
-                        " (b)-[:TYPE {cost:1.0}]->(d),\n" +
-                        " (c)-[:TYPE {cost:2.0}]->(d),\n" +
-                        " (d)-[:TYPE {cost:1.0}]->(e),\n" +
-                        " (d)-[:TYPE {cost:2.0}]->(f),\n" +
-                        " (e)-[:TYPE {cost:2.0}]->(g),\n" +
-                        " (f)-[:TYPE {cost:1.0}]->(g)";
+                        " (a)-[:TYPE]->(b),\n" +
+                        " (a)-[:TYPE]->(c),\n" +
+                        " (b)-[:TYPE]->(d),\n" +
+                        " (c)-[:TYPE]->(d),\n" +
+                        " (d)-[:TYPE]->(e),\n" +
+                        " (d)-[:TYPE]->(f),\n" +
+                        " (e)-[:TYPE]->(g),\n" +
+                        " (f)-[:TYPE]->(g)";
 
         db.execute(cypher);
 
@@ -100,14 +92,17 @@ public class BFSTest {
     }
 
     @Test
-    public void test() throws Exception {
+    public void testBfs() throws Exception {
+        final Traversal algo = new Traversal(graph);
+        final WalkResult result = algo.computeBfs(id("a"), Direction.OUTGOING, id("g"), Integer.MAX_VALUE, Integer.MAX_VALUE);
+        System.out.println("result.nodeIds = " + result.nodeIds);
+    }
 
-        final BFS algo = new BFS(db, graph);
-        final WalkResult result = algo.computeToTarget(id("a"), Direction.OUTGOING, id("g"));
-
-
-        System.out.println(result.nodeIds);
-
+    @Test
+    public void testDfs() throws Exception {
+        final Traversal algo = new Traversal(graph);
+        final WalkResult result = algo.computeDfs(id("a"), Direction.OUTGOING, id("g"), Integer.MAX_VALUE, Integer.MAX_VALUE);
+        System.out.println("result.nodeIds = " + result.nodeIds);
     }
 
 
