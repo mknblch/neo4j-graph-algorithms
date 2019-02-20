@@ -22,12 +22,7 @@ import com.carrotsearch.hppc.BitSet;
 import com.carrotsearch.hppc.IntArrayDeque;
 import com.carrotsearch.hppc.LongArrayList;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.impl.walking.WalkPath;
-import org.neo4j.graphalgo.impl.walking.WalkResult;
 import org.neo4j.graphdb.Direction;
-import org.neo4j.graphdb.Path;
-import org.neo4j.graphdb.Transaction;
-import org.neo4j.kernel.internal.GraphDatabaseAPI;
 
 import java.util.function.ObjIntConsumer;
 
@@ -106,14 +101,5 @@ public class Traversal extends Algorithm<Traversal> {
         depths = null;
         visited = null;
         return this;
-    }
-
-    public static WalkResult toWalkResult(GraphDatabaseAPI api, long[] nodes) {
-        try (Transaction transaction = api.beginTx()) {
-            final Path path = WalkPath.toPath(api, nodes);
-            final WalkResult result = new WalkResult(nodes, path);
-            transaction.success();
-            return result;
-        }
     }
 }

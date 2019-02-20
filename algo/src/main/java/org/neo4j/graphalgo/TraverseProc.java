@@ -24,7 +24,9 @@ import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.ProcedureConfiguration;
 import org.neo4j.graphalgo.core.utils.*;
 import org.neo4j.graphalgo.impl.Traversal;
+import org.neo4j.graphalgo.impl.walking.WalkPath;
 import org.neo4j.graphdb.Direction;
+import org.neo4j.graphdb.Path;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
@@ -52,7 +54,7 @@ public class TraverseProc {
     @Procedure(value = "algo.bfs", mode = Mode.WRITE)
     @Description("CALL algo.bfs.stream(label:String, relationshipType:String, startNodeId:long, {writeProperty:String, target:-1, maxDepth:2147483647}) " +
             "YIELD NodeId")
-    public Stream<Long> bfs(
+    public Stream<Path> bfs(
             @Name(value = "label") String label,
             @Name(value = "relationshipType") String relationship,
             @Name(value = "startNodeId") long startNode,
@@ -68,10 +70,6 @@ public class TraverseProc {
                 .asUndirected(true)
                 .withLog(log)
                 .load(configuration.getGraphImpl(HugeGraph.TYPE));
-        if (graph.nodeCount() == 0) {
-            graph.release();
-            return Stream.empty();
-        }
 
         final int source = graph.toMappedNodeId(startNode);
         final Traversal mstPrim = new Traversal(graph)
@@ -85,13 +83,13 @@ public class TraverseProc {
                 mappedTargetNode,
                 configuration.getNumber("maxDepth", Integer.MAX_VALUE).intValue());
 
-        return Arrays.stream(nodes).boxed();
+        return Stream.of(WalkPath.toPath(api, nodes));
     }
 
     @Procedure(value = "algo.dfs", mode = Mode.WRITE)
     @Description("CALL algo.dfs.stream(label:String, relationshipType:String, startNodeId:long, {writeProperty:String, target:-1, maxDepth:2147483647}) " +
             "YIELD NodeId")
-    public Stream<Long> dfs(
+    public Stream<Path> dfs(
             @Name(value = "label") String label,
             @Name(value = "relationshipType") String relationship,
             @Name(value = "startNodeId") long startNode,
@@ -106,10 +104,6 @@ public class TraverseProc {
                 .asUndirected(true)
                 .withLog(log)
                 .load(configuration.getGraphImpl(HugeGraph.TYPE));
-        if (graph.nodeCount() == 0) {
-            graph.release();
-            return Stream.empty();
-        }
 
         final int source = graph.toMappedNodeId(startNode);
         final Traversal mstPrim = new Traversal(graph)
@@ -123,7 +117,7 @@ public class TraverseProc {
                 mappedTargetNode,
                 configuration.getNumber("maxDepth", Integer.MAX_VALUE).intValue());
 
-        return Arrays.stream(nodes).boxed();
+        return Stream.of(WalkPath.toPath(api, nodes));
     }
 
 }

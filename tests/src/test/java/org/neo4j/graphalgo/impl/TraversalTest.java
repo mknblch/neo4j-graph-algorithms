@@ -30,6 +30,10 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.internal.kernel.api.exceptions.KernelException;
 import org.neo4j.test.rule.ImpermanentDatabaseRule;
 
+import java.util.Arrays;
+
+import static org.junit.Assert.assertEquals;
+
 /**
  *
  * Graph:
@@ -77,7 +81,7 @@ public class TraversalTest {
                 .withAnyLabel()
                 .withoutNodeProperties()
                 .withRelationshipWeightsFromProperty("cost", Double.MAX_VALUE)
-                .asUndirected(true)
+                .withDirection(Direction.BOTH)
                 .load(HeavyGraphFactory.class);
 
     }
@@ -92,18 +96,52 @@ public class TraversalTest {
     }
 
     @Test
-    public void testBfs() throws Exception {
+    public void testBfsOutgoing() throws Exception {
         final Traversal algo = new Traversal(graph);
-        final WalkResult result = algo.computeBfs(id("a"), Direction.OUTGOING, id("g"), Integer.MAX_VALUE, Integer.MAX_VALUE);
-        System.out.println("result.nodeIds = " + result.nodeIds);
+        final long[] result = algo.computeBfs(id("a"), Direction.OUTGOING, id("g"), Integer.MAX_VALUE);
+        System.out.println("result.nodeIds = " + Arrays.toString(result));
+        assertEquals(7, result.length);
     }
 
     @Test
-    public void testDfs() throws Exception {
+    public void testDfsOutgoing() throws Exception {
         final Traversal algo = new Traversal(graph);
-        final WalkResult result = algo.computeDfs(id("a"), Direction.OUTGOING, id("g"), Integer.MAX_VALUE, Integer.MAX_VALUE);
-        System.out.println("result.nodeIds = " + result.nodeIds);
+        final long[] result = algo.computeDfs(id("a"), Direction.OUTGOING, id("g"), Integer.MAX_VALUE);
+        System.out.println("result.nodeIds = " + Arrays.toString(result));
+        assertEquals(5, result.length);
     }
 
+
+    @Test
+    public void testBfsBoth() throws Exception {
+        final Traversal algo = new Traversal(graph);
+        final long[] result = algo.computeBfs(id("a"), Direction.BOTH, id("g"), Integer.MAX_VALUE);
+        System.out.println("result.nodeIds = " + Arrays.toString(result));
+        assertEquals(7, result.length);
+    }
+
+    @Test
+    public void testDfsBoth() throws Exception {
+        final Traversal algo = new Traversal(graph);
+        final long[] result = algo.computeDfs(id("a"), Direction.BOTH, id("g"), Integer.MAX_VALUE);
+        System.out.println("result.nodeIds = " + Arrays.toString(result));
+        assertEquals(5, result.length);
+    }
+
+    @Test
+    public void testBfsIncoming() throws Exception {
+        final Traversal algo = new Traversal(graph);
+        final long[] result = algo.computeBfs(id("g"), Direction.INCOMING, id("a"), Integer.MAX_VALUE);
+        System.out.println("result.nodeIds = " + Arrays.toString(result));
+        assertEquals(7, result.length);
+    }
+
+    @Test
+    public void testDfsIncoming() throws Exception {
+        final Traversal algo = new Traversal(graph);
+        final long[] result = algo.computeDfs(id("g"), Direction.INCOMING, id("a"), Integer.MAX_VALUE);
+        System.out.println("result.nodeIds = " + Arrays.toString(result));
+        assertEquals(5, result.length);
+    }
 
 }
