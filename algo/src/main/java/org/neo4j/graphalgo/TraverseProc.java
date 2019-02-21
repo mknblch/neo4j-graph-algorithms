@@ -50,7 +50,7 @@ public class TraverseProc {
     @Context
     public KernelTransaction transaction;
 
-
+/*
     @Procedure(value = "algo.bfs", mode = Mode.WRITE)
     @Description("CALL algo.bfs.stream(label:String, relationshipType:String, startNodeId:long, {writeProperty:String, target:-1, maxDepth:2147483647}) " +
             "YIELD NodeId")
@@ -119,5 +119,5 @@ public class TraverseProc {
 
         return Stream.of(WalkPath.toPath(api, nodes));
     }
-
+*/
 }

@@ -19,11 +19,13 @@
 package org.neo4j.graphalgo.impl;
 
 import com.carrotsearch.hppc.BitSet;
+import com.carrotsearch.hppc.DoubleArrayDeque;
 import com.carrotsearch.hppc.IntArrayDeque;
 import com.carrotsearch.hppc.LongArrayList;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphdb.Direction;
 
+import java.util.function.ObjDoubleConsumer;
 import java.util.function.ObjIntConsumer;
 
 /**
@@ -34,23 +36,33 @@ public class Traversal extends Algorithm<Traversal> {
     private final int nodeCount;
     private Graph graph;
     private IntArrayDeque nodes;
-    private IntArrayDeque depths;
+    private IntArrayDeque sources;
+    private DoubleArrayDeque weights;
     private BitSet visited;
 
     public Traversal(Graph graph) {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
         nodes = new IntArrayDeque(nodeCount);
-        depths = new IntArrayDeque(nodeCount);
+        sources = new IntArrayDeque(nodeCount);
+        weights = new DoubleArrayDeque(nodeCount);
         visited = new BitSet(nodeCount);
     }
 
-    public long[] computeBfs(int source, Direction direction, int target, int maxDepth) {
-        return traverse(source, direction, target, maxDepth, IntArrayDeque::addLast);
+    public long[] computeBfs(long sourceId, Direction direction, Predicate exitCondition) {
+        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, (s, t, w) -> 0., IntArrayDeque::addLast, DoubleArrayDeque::addLast);
     }
 
-    public long[] computeDfs(int source, Direction direction, int target, int maxDepth) {
-        return traverse(source, direction, target, maxDepth, IntArrayDeque::addFirst);
+    public long[] computeDfs(long sourceId, Direction direction, Predicate exitCondition) {
+        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, (s, t, w) -> 0., IntArrayDeque::addFirst, DoubleArrayDeque::addLast);
+    }
+
+    public long[] computeBfs(long sourceId, Direction direction, Predicate exitCondition, Aggregator aggregator) {
+        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, aggregator, IntArrayDeque::addLast, DoubleArrayDeque::addLast);
+    }
+
+    public long[] computeDfs(long sourceId, Direction direction, Predicate exitCondition, Aggregator aggregator) {
+        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, aggregator, IntArrayDeque::addFirst, DoubleArrayDeque::addLast);
     }
 
     /**
@@ -58,31 +70,47 @@ public class Traversal extends Algorithm<Traversal> {
      *
      * @return true if a path has been found, false otherwise
      */
-    private long[] traverse(int source, Direction direction, int target, int maxDepth, ObjIntConsumer<IntArrayDeque> pusher) {
+    private long[] traverse(int sourceNode,
+                            Direction direction,
+                            Predicate exitCondition,
+                            Aggregator agg,
+                            ObjIntConsumer<IntArrayDeque> nodeFunc,
+                            ObjDoubleConsumer<DoubleArrayDeque> weightFunc) {
+
         final LongArrayList list = new LongArrayList(nodeCount);
         nodes.clear();
-        depths.clear();
+        sources.clear();
         visited.clear();
-        pusher.accept(nodes, source);
-        pusher.accept(depths, 0);
-        visited.set(source);
+        nodeFunc.accept(nodes, sourceNode);
+        nodeFunc.accept(sources, sourceNode);
+        weightFunc.accept(weights, 0.);
+        visited.set(sourceNode);
+        loop:
         while (!nodes.isEmpty() && running()) {
+            final int source = sources.removeFirst();
             final int node = nodes.removeFirst();
-            final int depth = depths.removeFirst();
-            list.add(graph.toOriginalNodeId(node));
-            if (target == node) {
-                break;
-            }
-            if (depth >= maxDepth) {
-                break;
+            final double weight = weights.removeFirst();
+            switch (exitCondition.test(source, node, weight)) {
+                case BREAK:
+                    list.add(graph.toOriginalNodeId(node));
+                    break loop;
+                case CONTINUE:
+                    continue loop;
+                case CONTINUE_ADD:
+                    list.add(graph.toOriginalNodeId(node));
+                    continue loop;
+                case FOLLOW:
+                    list.add(graph.toOriginalNodeId(node));
+                    break;
             }
             graph.forEachRelationship(
                     node,
                     direction, (s, t, relId) -> {
                         if (!visited.get(t)) {
                             visited.set(t);
-                            pusher.accept(nodes, t);
-                            pusher.accept(depths, depth + 1);
+                            nodeFunc.accept(sources, node);
+                            nodeFunc.accept(nodes, t);
+                            weightFunc.accept(weights, agg.apply(s, t, weight));
                         }
                         return running();
                     });
@@ -98,8 +126,22 @@ public class Traversal extends Algorithm<Traversal> {
     @Override
     public Traversal release() {
         nodes = null;
-        depths = null;
+        weights = null;
         visited = null;
         return this;
+    }
+
+    public interface Predicate {
+
+        enum Result {
+            FOLLOW, BREAK, CONTINUE, CONTINUE_ADD
+        }
+
+        Result test(int sourceNode, int currentNode, double weightAtSource);
+    }
+
+    public interface Aggregator {
+
+        double apply(int sourceNode, int currentNode, double weightAtSource);
     }
 }
