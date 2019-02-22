@@ -24,7 +24,7 @@ import org.junit.Test;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.heavyweight.HeavyGraphFactory;
-import org.neo4j.graphalgo.impl.Traversal.Predicate.Result;
+import org.neo4j.graphalgo.impl.Traverse.ExitPredicate.Result;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Node;
 import org.neo4j.internal.kernel.api.exceptions.KernelException;
@@ -46,7 +46,7 @@ import static org.junit.Assert.*;
  *
  * @author mknblch
  */
-public class TraversalTest {
+public class TraverseTest {
 
     @ClassRule
     public static ImpermanentDatabaseRule db = new ImpermanentDatabaseRule();
@@ -112,7 +112,7 @@ public class TraversalTest {
     public void testBfsToTargetOut() throws Exception {
         final long source = id("a");
         final long target = id("d");
-        final long[] nodes = new Traversal(graph)
+        final long[] nodes = new Traverse(graph)
                 .computeBfs(
                         source,
                         Direction.OUTGOING,
@@ -129,7 +129,7 @@ public class TraversalTest {
     public void testDfsToTargetOut() throws Exception {
         final long source = id("a");
         final long target = id("g");
-        final long[] nodes = new Traversal(graph)
+        final long[] nodes = new Traverse(graph)
                 .computeDfs(
                         source,
                         Direction.OUTGOING,
@@ -147,7 +147,7 @@ public class TraversalTest {
     public void testDfsToTargetIn() throws Exception {
         final long source = id("g");
         final long target = id("a");
-        final long[] nodes = new Traversal(graph)
+        final long[] nodes = new Traverse(graph)
                 .computeDfs(
                         source,
                         Direction.INCOMING,
@@ -165,7 +165,7 @@ public class TraversalTest {
     public void testBfsToTargetIn() throws Exception {
         final long source = id("g");
         final long target = id("a");
-        final long[] nodes = new Traversal(graph)
+        final long[] nodes = new Traverse(graph)
                 .computeBfs(
                         source,
                         Direction.INCOMING,
@@ -184,7 +184,7 @@ public class TraversalTest {
     public void testBfsMaxDepthOut() throws Exception {
         final long source = id("a");
         final double maxHops = 3.;
-        final long[] nodes = new Traversal(graph)
+        final long[] nodes = new Traverse(graph)
                 .computeBfs(
                         source,
                         Direction.OUTGOING,
@@ -201,7 +201,7 @@ public class TraversalTest {
     public void testBfsMaxCostOut() throws Exception {
         final long source = id("a");
         final double maxCost = 3.;
-        final long[] nodes = new Traversal(graph)
+        final long[] nodes = new Traverse(graph)
                 .computeBfs(
                         source,
                         Direction.OUTGOING,

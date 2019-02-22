@@ -31,7 +31,7 @@ import java.util.function.ObjIntConsumer;
 /**
  * @author mknblch
  */
-public class Traversal extends Algorithm<Traversal> {
+public class Traverse extends Algorithm<Traverse> {
 
     private final int nodeCount;
     private Graph graph;
@@ -40,7 +40,7 @@ public class Traversal extends Algorithm<Traversal> {
     private DoubleArrayDeque weights;
     private BitSet visited;
 
-    public Traversal(Graph graph) {
+    public Traverse(Graph graph) {
         this.graph = graph;
         nodeCount = Math.toIntExact(graph.nodeCount());
         nodes = new IntArrayDeque(nodeCount);
@@ -49,30 +49,65 @@ public class Traversal extends Algorithm<Traversal> {
         visited = new BitSet(nodeCount);
     }
 
-    public long[] computeBfs(long sourceId, Direction direction, Predicate exitCondition) {
-        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, (s, t, w) -> 0., IntArrayDeque::addLast, DoubleArrayDeque::addLast);
-    }
-
-    public long[] computeDfs(long sourceId, Direction direction, Predicate exitCondition) {
-        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, (s, t, w) -> 0., IntArrayDeque::addFirst, DoubleArrayDeque::addLast);
-    }
-
-    public long[] computeBfs(long sourceId, Direction direction, Predicate exitCondition, Aggregator aggregator) {
-        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, aggregator, IntArrayDeque::addLast, DoubleArrayDeque::addLast);
-    }
-
-    public long[] computeDfs(long sourceId, Direction direction, Predicate exitCondition, Aggregator aggregator) {
-        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, aggregator, IntArrayDeque::addFirst, DoubleArrayDeque::addLast);
+    /**
+     * start BFS without aggregator
+     * @param sourceId source node id
+     * @param direction traversal direction
+     * @param exitCondition
+     * @return
+     */
+    public long[] computeBfs(long sourceId, Direction direction, ExitPredicate exitCondition) {
+        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, (s, t, w) -> .0, IntArrayDeque::addLast, DoubleArrayDeque::addLast);
     }
 
     /**
-     * calc path
-     *
-     * @return true if a path has been found, false otherwise
+     * start DSF without aggregator
+     * @param sourceId source node id
+     * @param direction traversal direction
+     * @param exitCondition
+     * @return
+     */
+    public long[] computeDfs(long sourceId, Direction direction, ExitPredicate exitCondition) {
+        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, (s, t, w) -> .0, IntArrayDeque::addFirst, DoubleArrayDeque::addFirst);
+    }
+
+    /**
+     * start BFS using an aggregator function
+     * @param sourceId source node id
+     * @param direction traversal direction
+     * @param exitCondition
+     * @param aggregator
+     * @return
+     */
+    public long[] computeBfs(long sourceId, Direction direction, ExitPredicate exitCondition, Aggregator aggregator) {
+        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, aggregator, IntArrayDeque::addLast, DoubleArrayDeque::addLast);
+    }
+
+    /**
+     * start DFS using an aggregator function
+     * @param sourceId source node id
+     * @param direction traversal direction
+     * @param exitCondition
+     * @param aggregator
+     * @return
+     */
+    public long[] computeDfs(long sourceId, Direction direction, ExitPredicate exitCondition, Aggregator aggregator) {
+        return traverse(graph.toMappedNodeId(sourceId), direction, exitCondition, aggregator, IntArrayDeque::addFirst, DoubleArrayDeque::addFirst);
+    }
+
+    /**
+     * traverse along the path
+     * @param sourceNode source node (mapped id)
+     * @param direction the traversal direction
+     * @param exitCondition exit condition
+     * @param agg weight accumulator function
+     * @param nodeFunc node accessor function (either ::addLast or ::addFirst to switch between fifo and lifo behaviour)
+     * @param weightFunc weight accessor function (either ::addLast or ::addFirst to switch between fifo and lifo behaviour)
+     * @return a list of nodes that have been visited
      */
     private long[] traverse(int sourceNode,
                             Direction direction,
-                            Predicate exitCondition,
+                            ExitPredicate exitCondition,
                             Aggregator agg,
                             ObjIntConsumer<IntArrayDeque> nodeFunc,
                             ObjDoubleConsumer<DoubleArrayDeque> weightFunc) {
@@ -83,7 +118,7 @@ public class Traversal extends Algorithm<Traversal> {
         visited.clear();
         nodeFunc.accept(nodes, sourceNode);
         nodeFunc.accept(sources, sourceNode);
-        weightFunc.accept(weights, 0.);
+        weightFunc.accept(weights, .0);
         visited.set(sourceNode);
         loop:
         while (!nodes.isEmpty() && running()) {
@@ -116,29 +151,57 @@ public class Traversal extends Algorithm<Traversal> {
     }
 
     @Override
-    public Traversal me() {
+    public Traverse me() {
         return this;
     }
 
     @Override
-    public Traversal release() {
+    public Traverse release() {
         nodes = null;
         weights = null;
         visited = null;
         return this;
     }
 
-    public interface Predicate {
+    public interface ExitPredicate {
 
         enum Result {
-            FOLLOW, BREAK, CONTINUE
+            /**
+             * add current node to the result set and visit all neighbors
+             */
+            FOLLOW,
+            /**
+             * add current node to the result set and terminate traversal
+             */
+            BREAK,
+            /**
+             * does not add node to the result set, does not follow its neighbors,
+             * just continue with next element on the stack
+             */
+            CONTINUE
         }
 
+        /**
+         * called once for each accepted node during traversal
+         *
+         * @param sourceNode the source node
+         * @param currentNode the current node
+         * @param weightAtSource the total weight that has been collected by the Aggregator during the traversal
+         * @return a result
+         */
         Result test(int sourceNode, int currentNode, double weightAtSource);
     }
 
+
     public interface Aggregator {
 
+        /**
+         * aggregate weight between source and current node
+         * @param sourceNode source node
+         * @param currentNode the current node
+         * @param weightAtSource the weight that has been aggregated for the currentNode so far
+         * @return new weight (e.g. weightAtSource + 1.)
+         */
         double apply(int sourceNode, int currentNode, double weightAtSource);
     }
 }

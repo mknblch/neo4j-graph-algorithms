@@ -22,9 +22,11 @@ import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.HugeGraph;
 import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.ProcedureConfiguration;
+import org.neo4j.graphalgo.core.heavyweight.HeavyGraph;
 import org.neo4j.graphalgo.core.utils.*;
-import org.neo4j.graphalgo.impl.Traversal;
+import org.neo4j.graphalgo.impl.Traverse;
 import org.neo4j.graphalgo.impl.walking.WalkPath;
+import org.neo4j.graphalgo.impl.walking.WalkResult;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Path;
 import org.neo4j.kernel.api.KernelTransaction;
@@ -32,7 +34,6 @@ import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.*;
 
-import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -50,125 +51,129 @@ public class TraverseProc {
     @Context
     public KernelTransaction transaction;
 
-
-    @Procedure(value = "algo.bfs.stream", mode = Mode.WRITE)
+    @Procedure(value = "algo.bfs.stream")
     @Description("CALL algo.bfs.stream(label:String, relationshipType:String, startNodeId:long, direction:Direction, " +
             "{writeProperty:String, target:long, maxDepth:long, weightProperty:String, maxCost:double}) YIELD nodeId")
-    public Stream<Path> bfs(
+    public Stream<WalkResult> bfs(
             @Name(value = "label") String label,
             @Name(value = "relationshipType") String relationship,
-            @Name(value = "direction") Direction direction,
+            @Name(value = "direction") String direction,
             @Name(value = "startNodeId") long startNode,
             @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
 
-        final ProcedureConfiguration configuration = ProcedureConfiguration.create(config);
+        final ProcedureConfiguration configuration = ProcedureConfiguration.create(config)
+                .overrideDirection(direction)
+                .overrideNodeLabelOrQuery(label)
+                .overrideRelationshipTypeOrQuery(relationship);
+
         final Graph graph = new GraphLoader(api, Pools.DEFAULT)
                 .withOptionalLabel(label)
                 .withOptionalRelationshipType(relationship)
                 .withoutNodeWeights()
                 .withOptionalRelationshipWeightsFromProperty(configuration.getWeightProperty(), 1.)
-                .asUndirected(true)
+                .withDirection(configuration.getDirection(Direction.OUTGOING))
                 .withLog(log)
-                .load(configuration.getGraphImpl(HugeGraph.TYPE));
-        final int source = graph.toMappedNodeId(startNode);
-        final Traversal traversal = new Traversal(graph)
+                .load(configuration.getGraphImpl(HeavyGraph.TYPE));
+        final Traverse traverse = new Traverse(graph)
                 .withProgressLogger(ProgressLogger.wrap(log, "BFS"))
                 .withTerminationFlag(TerminationFlag.wrap(transaction));
         final long targetNode = configuration.getNumber("target", -1L).longValue();
         final long maxDepth = configuration.getNumber("maxDepth", -1L).longValue();
         final int mappedTargetNode = targetNode == -1L ? -1 : graph.toMappedNodeId(targetNode);
-        final Traversal.Predicate exitFunction;
-        final Traversal.Aggregator aggregatorFunction;
+        final Traverse.ExitPredicate exitFunction;
+        final Traverse.Aggregator aggregatorFunction;
 
         // target node given; terminate if target is reached
         if (mappedTargetNode != -1) {
-            exitFunction = (s, t, w) -> t == mappedTargetNode ? Traversal.Predicate.Result.BREAK : Traversal.Predicate.Result.FOLLOW;
+            exitFunction = (s, t, w) -> t == mappedTargetNode ? Traverse.ExitPredicate.Result.BREAK : Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> .0;
 
         // maxDepth given; continue to aggregate nodes with lower depth until no more nodes left
         } else if (maxDepth != -1) {
-            exitFunction = (s, t, w) -> w >= maxDepth ? Traversal.Predicate.Result.CONTINUE : Traversal.Predicate.Result.FOLLOW;
+            exitFunction = (s, t, w) -> w >= maxDepth ? Traverse.ExitPredicate.Result.CONTINUE : Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> w + 1.;
 
         // maxCost & weightProperty given; aggregate nodes with lower cost then maxCost
         } else if (configuration.hasWeightProperty() && configuration.containsKeys("maxCost")) {
             final double maxCost = configuration.getNumber("maxCost", 1.).doubleValue();
-            exitFunction = (s, t, w) -> w >= maxCost ? Traversal.Predicate.Result.CONTINUE : Traversal.Predicate.Result.FOLLOW;
+            exitFunction = (s, t, w) -> w >= maxCost ? Traverse.ExitPredicate.Result.CONTINUE : Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> w + graph.weightOf(s, t);
 
         // do complete BFS until all nodes have been visited
         } else {
-            exitFunction = (s, t, w) -> Traversal.Predicate.Result.FOLLOW;
+            exitFunction = (s, t, w) -> Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> .0;
         }
 
-        final long[] nodes = traversal.computeBfs(
-                source,
+        final long[] nodes = traverse.computeBfs(
+                startNode,
                 configuration.getDirection(Direction.OUTGOING),
                 exitFunction,
                 aggregatorFunction);
 
-        return Stream.of(WalkPath.toPath(api, nodes));
+        return Stream.of(new WalkResult(nodes, WalkPath.toPath(api, nodes)));
     }
 
-    @Procedure(value = "algo.dfs.stream", mode = Mode.WRITE)
+    @Procedure(value = "algo.dfs.stream")
     @Description("CALL algo.dfs.stream(label:String, relationshipType:String, startNodeId:long, direction:Direction, " +
             "{writeProperty:String, target:long, maxDepth:long, weightProperty:String, maxCost:double}) YIELD nodeId")
-    public Stream<Path> dfs(
+    public Stream<WalkResult> dfs(
             @Name(value = "label") String label,
             @Name(value = "relationshipType") String relationship,
-            @Name(value = "direction") Direction direction,
+            @Name(value = "direction") String direction,
             @Name(value = "startNodeId") long startNode,
             @Name(value = "config", defaultValue = "{}") Map<String, Object> config) {
 
-        final ProcedureConfiguration configuration = ProcedureConfiguration.create(config);
+        final ProcedureConfiguration configuration = ProcedureConfiguration.create(config)
+                .overrideDirection(direction)
+                .overrideNodeLabelOrQuery(label)
+                .overrideRelationshipTypeOrQuery(relationship);
         final Graph graph = new GraphLoader(api, Pools.DEFAULT)
                 .withOptionalLabel(label)
                 .withOptionalRelationshipType(relationship)
                 .withoutNodeWeights()
                 .withOptionalRelationshipWeightsFromProperty(configuration.getWeightProperty(), 1.)
-                .asUndirected(true)
+                .withDirection(configuration.getDirection(Direction.OUTGOING))
                 .withLog(log)
-                .load(configuration.getGraphImpl(HugeGraph.TYPE));
-        final int source = graph.toMappedNodeId(startNode);
-        final Traversal traversal = new Traversal(graph)
-                .withProgressLogger(ProgressLogger.wrap(log, "BFS"))
+                .load(configuration.getGraphImpl(HeavyGraph.TYPE));
+        final Traverse traverse = new Traverse(graph)
+                .withProgressLogger(ProgressLogger.wrap(log, "DFS"))
                 .withTerminationFlag(TerminationFlag.wrap(transaction));
         final long targetNode = configuration.getNumber("target", -1L).longValue();
         final long maxDepth = configuration.getNumber("maxDepth", -1L).longValue();
         final int mappedTargetNode = targetNode == -1L ? -1 : graph.toMappedNodeId(targetNode);
-        final Traversal.Predicate exitFunction;
-        final Traversal.Aggregator aggregatorFunction;
+        final Traverse.ExitPredicate exitFunction;
+        final Traverse.Aggregator aggregatorFunction;
 
         // target node given; terminate if target is reached
         if (mappedTargetNode != -1) {
-            exitFunction = (s, t, w) -> t == mappedTargetNode ? Traversal.Predicate.Result.BREAK : Traversal.Predicate.Result.FOLLOW;
+            exitFunction = (s, t, w) -> t == mappedTargetNode ? Traverse.ExitPredicate.Result.BREAK : Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> .0;
 
         // maxDepth given; continue to aggregate nodes with lower depth until no more nodes left
         } else if (maxDepth != -1) {
-            exitFunction = (s, t, w) -> w >= maxDepth ? Traversal.Predicate.Result.CONTINUE : Traversal.Predicate.Result.FOLLOW;
+            exitFunction = (s, t, w) -> w > maxDepth ? Traverse.ExitPredicate.Result.CONTINUE : Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> w + 1.;
 
         // maxCost & weightProperty given; aggregate nodes with lower cost then maxCost
         } else if (configuration.hasWeightProperty() && configuration.containsKeys("maxCost")) {
             final double maxCost = configuration.getNumber("maxCost", 1.).doubleValue();
-            exitFunction = (s, t, w) -> w >= maxCost ? Traversal.Predicate.Result.CONTINUE : Traversal.Predicate.Result.FOLLOW;
+            exitFunction = (s, t, w) -> w >= maxCost ? Traverse.ExitPredicate.Result.CONTINUE : Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> w + graph.weightOf(s, t);
 
         // do complete BFS until all nodes have been visited
         } else {
-            exitFunction = (s, t, w) -> Traversal.Predicate.Result.FOLLOW;
+            exitFunction = (s, t, w) -> Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> .0;
         }
 
-        final long[] nodes = traversal.computeDfs(
-                source,
+        final long[] nodes = traverse.computeDfs(
+                startNode,
                 configuration.getDirection(Direction.OUTGOING),
                 exitFunction,
                 aggregatorFunction);
 
-        return Stream.of(WalkPath.toPath(api, nodes));
+        return Stream.of(new WalkResult(nodes, WalkPath.toPath(api, nodes)));
     }
 
 }
