@@ -96,9 +96,6 @@ public class Traversal extends Algorithm<Traversal> {
                     break loop;
                 case CONTINUE:
                     continue loop;
-                case CONTINUE_ADD:
-                    list.add(graph.toOriginalNodeId(node));
-                    continue loop;
                 case FOLLOW:
                     list.add(graph.toOriginalNodeId(node));
                     break;
@@ -134,7 +131,7 @@ public class Traversal extends Algorithm<Traversal> {
     public interface Predicate {
 
         enum Result {
-            FOLLOW, BREAK, CONTINUE, CONTINUE_ADD
+            FOLLOW, BREAK, CONTINUE
         }
 
         Result test(int sourceNode, int currentNode, double weightAtSource);
