@@ -52,8 +52,8 @@ public class LouvainProc {
     public static final String INCLUDE_INTERMEDIATE_COMMUNITIES = "includeIntermediateCommunities";
 
     private static final String CLUSTERING_IDENTIFIER = "clustering";
-    public static final String RANDOM_NEIGHBOR = "randomNeighbor";
     public static final String INNER_ITERATIONS = "innerIterations";
+    public static final String COMMUNITY_SELECTION = "communitySelection";
 
     @Context
     public GraphDatabaseAPI api;
@@ -66,7 +66,7 @@ public class LouvainProc {
 
     @Procedure(value = "algo.louvain", mode = Mode.WRITE)
     @Description("CALL algo.louvain(label:String, relationship:String, " +
-            "{weightProperty:'weight', defaultValue:1.0, write: true, writeProperty:'community', concurrency:4, community:'propertyOfPredefinedCommunity', innerIterations:10, randomNeighbor:false}) " +
+            "{weightProperty:'weight', defaultValue:1.0, write: true, writeProperty:'community', concurrency:4, community:'propertyOfPredefinedCommunity', innerIterations:10, communitySelection:'classic'}) " +
             "YIELD nodes, communityCount, iterations, loadMillis, computeMillis, writeMillis")
     public Stream<LouvainResult> louvain(
             @Name(value = "label", defaultValue = "") String label,
@@ -96,7 +96,7 @@ public class LouvainProc {
         // evaluation
         final int iterations = configuration.getIterations(10);
         try (ProgressTimer timer = builder.timeEval()) {
-            final boolean randomNeighbor = configuration.get(RANDOM_NEIGHBOR, false);
+            final boolean randomNeighbor = configuration.get(COMMUNITY_SELECTION, "classic").equalsIgnoreCase("random");
             final int maxIterations = configuration.getNumber(INNER_ITERATIONS, 10L).intValue();
             if (configuration.getString(DEFAULT_CLUSTER_PROPERTY).isPresent()) {
                 // use predefined clustering
@@ -132,7 +132,7 @@ public class LouvainProc {
 
     @Procedure(value = "algo.louvain.stream")
     @Description("CALL algo.louvain.stream(label:String, relationship:String, " +
-            "{weightProperty:'propertyName', defaultValue:1.0, concurrency:4, community:'propertyOfPredefinedCommunity', innerIterations:10, randomNeighbor:false) " +
+            "{weightProperty:'propertyName', defaultValue:1.0, concurrency:4, community:'propertyOfPredefinedCommunity', innerIterations:10, communitySelection:'classic') " +
             "YIELD nodeId, community - yields a setId to each node id")
     public Stream<Louvain.StreamingResult> louvainStream(
             @Name(value = "label", defaultValue = "") String label,
@@ -150,12 +150,13 @@ public class LouvainProc {
                 .withProgressLogger(ProgressLogger.wrap(log, "Louvain"))
                 .withTerminationFlag(TerminationFlag.wrap(transaction));
 
+        final boolean randomNeighbor = configuration.get(COMMUNITY_SELECTION, "classic").equalsIgnoreCase("random");
         if (configuration.getString(DEFAULT_CLUSTER_PROPERTY).isPresent()) {
             // use predefined clustering
             final WeightMapping communityMap = ((NodeProperties) graph).nodeProperties(CLUSTERING_IDENTIFIER);
-            louvain.compute(communityMap, configuration.getIterations(10), configuration.getNumber(INNER_ITERATIONS, 10L).intValue(), configuration.get(RANDOM_NEIGHBOR, false));
+            louvain.compute(communityMap, configuration.getIterations(10), configuration.getNumber(INNER_ITERATIONS, 10L).intValue(), randomNeighbor);
         } else {
-            louvain.compute(configuration.getIterations(10), configuration.getNumber(INNER_ITERATIONS, 10L).intValue(), configuration.get(RANDOM_NEIGHBOR, false));
+            louvain.compute(configuration.getIterations(10), configuration.getNumber(INNER_ITERATIONS, 10L).intValue(), randomNeighbor);
         }
 
         if (graph.nodeCount() == 0) {
