@@ -139,6 +139,21 @@ public class TraverseTest {
     }
 
     /**
+     * dfs on outgoing rels. until taregt 'a' is reached. the exit function
+     * immediately exits if target is reached
+     */
+    @Test
+    public void testExitConditionNeverTerminates() throws Exception {
+        final long source = id("a");
+        final long[] nodes = new Traverse(graph)
+                .computeDfs(
+                        source,
+                        Direction.OUTGOING,
+                        (s, t, w) -> Result.FOLLOW);
+        assertEquals(7, nodes.length); // should contain all nodes
+    }
+
+    /**
      * dfs on incoming rels. from 'g' until 'a' is reached. exit function
      * immediately returns if target is reached
      *

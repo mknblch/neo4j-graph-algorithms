@@ -36,7 +36,7 @@ import static org.junit.Assert.*;
  *
  * @author mknblch
  */
-public class TraverseTest {
+public class TraverseIntegrationTest {
 
 
     @ClassRule
@@ -101,6 +101,16 @@ public class TraverseTest {
                 fail(ex + "(" + id + ") not in " + nodeIds);
             }
         }
+    }
+
+    @Test
+    public void testFindAnyOf() {
+        final String cypher = "MATCH (n:Node {name:'a'}) WITH id(n) as s CALL algo.dfs.stream('Node', 'Type', '>', s, {targetNodes:[4,5]}) YIELD nodeIds RETURN nodeIds";
+        db.execute(cypher).accept(row -> {
+            List<Long> nodeIds = (List<Long>) row.get("nodeIds");
+            assertEquals(4, nodeIds.size());
+            return true;
+        });
     }
 
     @Test

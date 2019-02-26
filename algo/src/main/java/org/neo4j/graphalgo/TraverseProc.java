@@ -34,7 +34,10 @@ import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.*;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -77,17 +80,19 @@ public class TraverseProc {
         final Traverse traverse = new Traverse(graph)
                 .withProgressLogger(ProgressLogger.wrap(log, "BFS"))
                 .withTerminationFlag(TerminationFlag.wrap(transaction));
-        final long targetNode = configuration.getNumber("target", -1L).longValue();
+
+        final List<Long> targetNodes = configuration.get("targetNodes", Collections.emptyList());
         final long maxDepth = configuration.getNumber("maxDepth", -1L).longValue();
-        final int mappedTargetNode = targetNode == -1L ? -1 : graph.toMappedNodeId(targetNode);
         final Traverse.ExitPredicate exitFunction;
         final Traverse.Aggregator aggregatorFunction;
 
         // target node given; terminate if target is reached
-        if (mappedTargetNode != -1) {
-            exitFunction = (s, t, w) -> t == mappedTargetNode ? Traverse.ExitPredicate.Result.BREAK : Traverse.ExitPredicate.Result.FOLLOW;
+        if (!targetNodes.isEmpty()) {
+            final List<Integer> mappedTargets = targetNodes.stream()
+                    .map(graph::toMappedNodeId)
+                    .collect(Collectors.toList());
+            exitFunction = (s, t, w) -> mappedTargets.contains(t) ? Traverse.ExitPredicate.Result.BREAK : Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> .0;
-
         // maxDepth given; continue to aggregate nodes with lower depth until no more nodes left
         } else if (maxDepth != -1) {
             exitFunction = (s, t, w) -> w >= maxDepth ? Traverse.ExitPredicate.Result.CONTINUE : Traverse.ExitPredicate.Result.FOLLOW;
@@ -139,15 +144,18 @@ public class TraverseProc {
         final Traverse traverse = new Traverse(graph)
                 .withProgressLogger(ProgressLogger.wrap(log, "DFS"))
                 .withTerminationFlag(TerminationFlag.wrap(transaction));
-        final long targetNode = configuration.getNumber("target", -1L).longValue();
+
+        final List<Long> targetNodes = configuration.get("targetNodes", Collections.emptyList());
         final long maxDepth = configuration.getNumber("maxDepth", -1L).longValue();
-        final int mappedTargetNode = targetNode == -1L ? -1 : graph.toMappedNodeId(targetNode);
         final Traverse.ExitPredicate exitFunction;
         final Traverse.Aggregator aggregatorFunction;
 
         // target node given; terminate if target is reached
-        if (mappedTargetNode != -1) {
-            exitFunction = (s, t, w) -> t == mappedTargetNode ? Traverse.ExitPredicate.Result.BREAK : Traverse.ExitPredicate.Result.FOLLOW;
+        if (!targetNodes.isEmpty()) {
+            final List<Integer> mappedTargets = targetNodes.stream()
+                    .map(graph::toMappedNodeId)
+                    .collect(Collectors.toList());
+            exitFunction = (s, t, w) -> mappedTargets.contains(t) ? Traverse.ExitPredicate.Result.BREAK : Traverse.ExitPredicate.Result.FOLLOW;
             aggregatorFunction = (s, t, w) -> .0;
 
         // maxDepth given; continue to aggregate nodes with lower depth until no more nodes left
