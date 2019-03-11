@@ -36,7 +36,10 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * Randomized Approximate Brandes
+ * Randomized Approximate Brandes. See https://arxiv.org/pdf/1702.06087.pdf.
+ *
+ * The implementation follows the same approach as {@link ParallelBetweennessCentrality}
+ * with an additional
  *
  * @author mknblch
  */
