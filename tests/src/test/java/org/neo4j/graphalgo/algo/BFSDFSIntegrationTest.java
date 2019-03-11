@@ -33,10 +33,17 @@ import static junit.framework.TestCase.assertNull;
 import static org.junit.Assert.*;
 
 /**
+ * Graph:
+ *
+ *     (b)   (e)
+ *   2/ 1\ 2/ 1\
+ * >(a)  (d)  ((g))
+ *   1\ 2/ 1\ 2/
+ *    (c)   (f)
  *
  * @author mknblch
  */
-public class TraverseIntegrationTest {
+public class BFSDFSIntegrationTest {
 
 
     @ClassRule

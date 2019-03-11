@@ -46,7 +46,7 @@ import static org.junit.Assert.*;
  *
  * @author mknblch
  */
-public class TraverseTest {
+public class BFSDFSTest {
 
     @ClassRule
     public static ImpermanentDatabaseRule db = new ImpermanentDatabaseRule();
