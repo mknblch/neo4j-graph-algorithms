@@ -33,7 +33,10 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * Harmonic Centrality Algorithm
+ * Harmonic Centrality Algorithm.
+ *
+ * Harmonic centrality (also known as valued centrality) is a variant of closeness centrality,
+ * that was invented to solve the problem the original formula had when dealing with unconnected graphs.
  *
  * @author mknblch
  */

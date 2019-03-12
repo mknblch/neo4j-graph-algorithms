@@ -42,6 +42,9 @@ import java.util.stream.Stream;
  * with an additional node filter to select interesting nodes. the result is multiplied
  * with a factor which is based on the probability of which the filter accepts nodes.
  *
+ * There is a significant performance drop if the direction is BOOTH. Its more efficient
+ * to load the graph as undirected and do the
+ *
  * @author mknblch
  */
 public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweennessCentrality> {
@@ -50,7 +53,6 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
 
         /**
          * node id filter
-         *
          * @return true if the nodes is accepted, false otherwise
          */
         boolean select(int nodeId);
@@ -76,6 +78,7 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
     private final int concurrency;
     private SelectionStrategy selectionStrategy;
     private Direction direction = Direction.OUTGOING;
+    // used to
     private double divisor = 1.0;
 
     private int maxDepth = Integer.MAX_VALUE;
@@ -97,6 +100,7 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
 
     public RABrandesBetweennessCentrality withDirection(Direction direction) {
         this.direction = direction;
+        // during evaluation booth counts each node twice
         this.divisor = direction == Direction.BOTH ? 2.0 : 1.0;
         return this;
     }
@@ -161,8 +165,17 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
      */
     private class BCTask implements Runnable {
 
+        // we have to keep all paths during eval (memory intensive)
         private final IntObjectMap<IntArrayList> paths;
-        private final IntStack stack;
+        /**
+         * contains nodes which have been visited during the first round
+         */
+        private final IntStack pivots;
+        /**
+         * the queue contains 2 elements per node. the node itself
+         * and its depth. Both values are pushed or taken from the
+         * stack during the evaluation as pair.
+         */
         private final IntArrayDeque queue;
         private final IntDoubleMap delta;
         private final IntIntMap sigma;
@@ -170,7 +183,7 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
 
         private BCTask() {
             this.paths = new IntObjectScatterMap<>(expectedNodeCount);
-            this.stack = new IntStack();
+            this.pivots = new IntStack();
             this.queue = new IntArrayDeque();
             this.sigma = new IntIntScatterMap(expectedNodeCount);
             this.delta = new IntDoubleScatterMap(expectedNodeCount);
@@ -182,14 +195,18 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
         public void run() {
             final double f = (nodeCount * divisor) / selectionStrategy.size();
             for (;;) {
+                // take start node from the queue
                 final int startNodeId = nodeQueue.getAndIncrement();
                 if (startNodeId >= nodeCount || !running()) {
                     return;
                 }
+                // check whether the node is part of the subset
                 if (!selectionStrategy.select(startNodeId)) {
                     continue;
                 }
+                // reset
                 getProgressLogger().logProgress((double) startNodeId / (nodeCount - 1));
+                // default value is -1 (checked during evaluation)
                 Arrays.fill(distance, -1);
                 sigma.clear();
                 paths.clear();
@@ -198,20 +215,23 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
                 distance[startNodeId] = 0;
                 queue.addLast(startNodeId);
                 queue.addLast(0);
+                // as long as the inner queue has more nodes
                 while (!queue.isEmpty()) {
                     int node = queue.removeFirst();
                     int nodeDepth = queue.removeFirst();
                     if (nodeDepth - 1 > maxDepth) {
                         continue;
                     }
-                    stack.push(node);
+                    pivots.push(node);
                     graph.forEachRelationship(node, direction, (source, target, relationId) -> {
+                        // check if distance has been set before
                         if (distance[target] < 0) {
                             queue.addLast(target);
                             queue.addLast(nodeDepth + 1);
+                            // distance changes during exec and might trigger next condition
                             distance[target] = distance[node] + 1;
                         }
-
+                        // no if-else here since distance could have been changed in the first condition
                         if (distance[target] == distance[node] + 1) {
                             sigma.addTo(target, sigma.getOrDefault(node, 0));
                             append(target, node);
@@ -220,8 +240,8 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
                     });
                 }
 
-                while (!stack.isEmpty()) {
-                    int node = stack.pop();
+                while (!pivots.isEmpty()) {
+                    int node = pivots.pop();
                     final IntArrayList intCursors = paths.get(node);
                     if (null != intCursors) {
                         intCursors.forEach((Consumer<? super IntCursor>) c -> {
@@ -238,6 +258,7 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
             }
         }
 
+        // append node to the path at target
         private void append(int target, int node) {
             IntArrayList intCursors = paths.get(target);
             if (null == intCursors) {
