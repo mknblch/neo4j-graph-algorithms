@@ -44,8 +44,8 @@ import java.util.stream.Stream;
  * until nodeCount is reached (works because we have consecutive ids)
  *
  * Note:
- * The algo can be optimized using MSBFS but at the time of development some must have features in the MSBFS
- * were missing (like manually canceling evaluation if some conditions have been met).
+ * The algo can be adapted to use the MSBFS but at the time of development some must have
+ * features in the MSBFS were missing (like manually canceling evaluation if some conditions have been met).
  *
  *
  * @author mknblch
@@ -84,6 +84,13 @@ public class ParallelBetweennessCentrality extends Algorithm<ParallelBetweenness
         this.centrality = new AtomicDoubleArray(nodeCount);
     }
 
+    /**
+     * sete traversal direction
+     * OUTGOING for undirected graphs!
+     *
+     * @param direction
+     * @return
+     */
     public ParallelBetweennessCentrality withDirection(Direction direction) {
         this.direction = direction;
         this.divisor = direction == Direction.BOTH ? 2.0 : 1.0;
@@ -127,11 +134,18 @@ public class ParallelBetweennessCentrality extends Algorithm<ParallelBetweenness
                                 centrality.get(nodeId)));
     }
 
+    /**
+     * @return
+     */
     @Override
     public ParallelBetweennessCentrality me() {
         return this;
     }
 
+    /**
+     * release internal data structures
+     * @return
+     */
     @Override
     public ParallelBetweennessCentrality release() {
         graph = null;
@@ -140,8 +154,7 @@ public class ParallelBetweennessCentrality extends Algorithm<ParallelBetweenness
     }
 
     /**
-     * a BCTask takes one element from the nodeQueue as long as
-     * it is lower then nodeCount and calculates it's centrality
+     * a BCTask takes one element from the nodeQueue and calculates it's centrality
      */
     private class BCTask implements Runnable {
 
@@ -151,6 +164,7 @@ public class ParallelBetweennessCentrality extends Algorithm<ParallelBetweenness
         private final IntStack stack;
         // bfs queue
         private final IntArrayDeque queue;
+        // bc data structures
         private final double[] delta;
         private final int[] sigma;
         private final int[] distance;
@@ -168,6 +182,7 @@ public class ParallelBetweennessCentrality extends Algorithm<ParallelBetweenness
         public void run() {
             for (;;) {
                 reset();
+                // take a node and calculate bc
                 final int startNodeId = nodeQueue.getAndIncrement();
                 if (startNodeId >= nodeCount || !running()) {
                     return;
@@ -178,6 +193,12 @@ public class ParallelBetweennessCentrality extends Algorithm<ParallelBetweenness
             }
         }
 
+        /**
+         * calculate bc concurrently. a concurrent shared decimal array is used.
+         *
+         * @param startNodeId
+         * @return
+         */
         private boolean calculateBetweenness(int startNodeId) {
             getProgressLogger().logProgress((double) startNodeId / (nodeCount - 1));
             sigma[startNodeId] = 1;

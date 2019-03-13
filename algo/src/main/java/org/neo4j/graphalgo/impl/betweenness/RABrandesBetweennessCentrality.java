@@ -98,6 +98,11 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
         this.expectedNodeCount = selectionStrategy.size();
     }
 
+    /**
+     * set traversal direction. Use OUTGOING for undirected.
+     * @param direction
+     * @return
+     */
     public RABrandesBetweennessCentrality withDirection(Direction direction) {
         this.direction = direction;
         // during evaluation booth counts each node twice
@@ -105,6 +110,11 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
         return this;
     }
 
+    /**
+     * set max depth (maximum number of hops from the start node)
+     * @param maxDepth
+     * @return
+     */
     public RABrandesBetweennessCentrality withMaxDepth(int maxDepth) {
         this.maxDepth = maxDepth;
         return this;
@@ -152,6 +162,10 @@ public class RABrandesBetweennessCentrality extends Algorithm<RABrandesBetweenne
         return this;
     }
 
+    /**
+     * release inner data structures
+     * @return
+     */
     @Override
     public RABrandesBetweennessCentrality release() {
         graph = null;

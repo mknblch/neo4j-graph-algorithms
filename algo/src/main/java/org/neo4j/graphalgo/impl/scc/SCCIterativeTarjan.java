@@ -61,7 +61,6 @@ public class SCCIterativeTarjan extends Algorithm<SCCIterativeTarjan> implements
     private IntStack todo;
     // number of strongly connected components
     private int setCount;
-
     private int minSetSize;
     private int maxSetSize;
 
