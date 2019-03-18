@@ -48,6 +48,12 @@ import java.util.stream.Stream;
  * After each step a new graph gets built from the actual community mapping
  * and is used as input for the next step.
  *
+ *
+ * hugification:
+ *
+ *  - (long long) to (double) map : for aggregated relationship weights
+ *  - sparse (long) to (list of long) map / multimap : nodeId to targetId mapping
+ *
  * @author mknblch
  */
 public class Louvain extends Algorithm<Louvain> {

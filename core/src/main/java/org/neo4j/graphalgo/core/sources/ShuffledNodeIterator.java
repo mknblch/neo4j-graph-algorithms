@@ -28,6 +28,9 @@ import java.util.function.IntPredicate;
 /**
  * NodeIterator adapter with randomized order
  *
+ * hugification:
+ *  - long array / list with shuffle function
+ *
  * @author mknblch
  */
 public class ShuffledNodeIterator implements NodeIterator {

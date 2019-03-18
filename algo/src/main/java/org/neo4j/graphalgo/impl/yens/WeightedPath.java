@@ -29,7 +29,12 @@ import java.util.function.IntConsumer;
 import java.util.function.IntPredicate;
 
 /**
- * array based path of nodes & a weight
+ * array based path of nodes & a weight.
+ *
+ * hugification:
+ *
+ *  - long array / list : nodes
+ *
  *
  * @author mknblch
  */
@@ -52,7 +57,11 @@ public class WeightedPath {
         this.offset = offset;
     }
 
-    // append a node to the path
+
+    /**
+     * append a node to the path
+     * @param nodeId
+     */
     public void append(int nodeId) {
         nodes = ArrayUtil.grow(nodes, offset + 1);
         nodes[offset++] = nodeId;
@@ -67,19 +76,38 @@ public class WeightedPath {
         return this;
     }
 
+    /**
+     * return node id at index
+     * @param index
+     * @return
+     */
     public int node(int index) {
         return nodes[index];
     }
 
+    /**
+     * number of nodes in this path
+     * @return
+     */
     public int size() {
         return offset;
     }
 
+    /**
+     * set accumulated weight for this path
+     * @param weight
+     * @return
+     */
     public WeightedPath withWeight(double weight) {
         this.weight = weight;
         return this;
     }
 
+    /**
+     * check if this path contains a given node id
+     * @param node
+     * @return
+     */
     public boolean containsNode(int node) {
         for (int i : nodes) {
             if (i == node) {
@@ -89,6 +117,10 @@ public class WeightedPath {
         return false;
     }
 
+    /**
+     * consumer based iteration over nodes
+     * @param consumer
+     */
     public void forEach(IntPredicate consumer) {
         for (int i = 0; i < offset; i++) {
             if (!consumer.test(nodes[i])) {
@@ -97,18 +129,31 @@ public class WeightedPath {
         }
     }
 
+    /**
+     * consumer based iteration over all edges of this path
+     * @param consumer
+     */
     public void forEachEdge(EdgeConsumer consumer) {
         for (int i = 0; i < offset - 1; i++) {
             consumer.accept(nodes[i], nodes[i + 1]);
         }
     }
 
+    /**
+     * consumer based iteration over nodes
+     * @param consumer
+     */
     public void forEachDo(IntConsumer consumer) {
         for (int i = 0; i < offset; i++) {
             consumer.accept(nodes[i]);
         }
     }
 
+    /**
+     * calculate weight of the path by summing all weights of all relations
+     * @param weights
+     * @return
+     */
     public WeightedPath evaluateAndSetCost(RelationshipWeights weights) {
         this.weight = 0.;
         forEachEdge((a, b) -> {
@@ -117,25 +162,45 @@ public class WeightedPath {
         return this;
     }
 
+    /**
+     * get weight / costs for the path
+     * @return
+     */
     public double getCost() {
         return weight;
     }
 
-    public WeightedPath pathTo(int end) {
-        if (end > size()) {
+    /**
+     * create sub path from startNode to node at index
+     * @param index
+     * @return
+     */
+    public WeightedPath pathTo(int index) {
+        if (index > size()) {
             throw new ArrayIndexOutOfBoundsException();
         }
-        return new WeightedPath(Arrays.copyOf(nodes, end + 1), end + 1);
+        return new WeightedPath(Arrays.copyOf(nodes, index + 1), index + 1);
     }
 
+    /**
+     * retrieve the i'th edge of the path
+     * @param i
+     * @return
+     */
     public long edge(int i) {
         return RawValues.combineIntInt(nodes[i], nodes[i + 1]);
     }
 
+    /**
+     * clear path
+     */
     public void clear() {
         offset = 0;
     }
 
+    /**
+     * reverse the path
+     */
     public WeightedPath reverse() {
         for (int i = 0; i < offset / 2; i++) {
             int temp = nodes[i];

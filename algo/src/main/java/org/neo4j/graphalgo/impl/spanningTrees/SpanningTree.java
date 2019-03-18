@@ -23,12 +23,18 @@ import org.neo4j.graphalgo.core.write.PropertyTranslator;
 
 /**
  * group of nodes that form a spanning tree
+ *
+ * hugification:
+ *  - long array : parent array
  */
 public class SpanningTree {
 
+    // start node, root of the tree
     public final int head;
+
     public final int nodeCount;
     public final int effectiveNodeCount;
+    // parent array tree, nodeId to parent-nodeId mapping
     public final int[] parent;
 
     public SpanningTree(int head, int nodeCount, int effectiveNodeCount, int[] parent) {

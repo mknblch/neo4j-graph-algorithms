@@ -30,7 +30,16 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * specialized dijkstra impl. for YensKShortestPath
+ * specialized dijkstra impl. with aditional nodeId filter for YensKShortestPath.
+ *
+ * hugification:
+ *  - we may be able to replace this class with BFS / DFS impl.
+ *
+ *  data structures:
+ *      - long double map : cost map
+ *      - Long priority queue : node prio queue
+ *      - long bit set : visited nodes
+ *      - long to long map / array : paths
  *
  * @author mknblch
  */

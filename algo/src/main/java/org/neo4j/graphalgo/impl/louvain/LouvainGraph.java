@@ -39,6 +39,11 @@ import java.util.function.IntPredicate;
  * undirected direction. The degree is just the sum of
  * incoming and outgoing degrees.
  *
+ * hugification:
+ *
+ *  - (long long) to (double) map : for aggregated relationship weights
+ *  - sparse (long) to (list of long) map / multimap : nodeId to targetId mapping
+ *
  * @author mknblch
  */
 public class LouvainGraph implements Graph {

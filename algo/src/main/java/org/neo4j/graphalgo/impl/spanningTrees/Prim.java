@@ -33,6 +33,15 @@ import java.util.Arrays;
 /**
  * Sequential Single-Source minimum/maximum weight spanning tree algorithm (PRIM).
  *
+ * ----
+ *
+ * hugification:
+ *  - long bitset : visited nodes
+ *  - long array : parent array in spanningTree
+ *  - long double map : shared cost map
+ *  - shared long prio queue : priority queue with external cost map
+ *
+ *
  * @author mknblch
  */
 public class Prim extends Algorithm<Prim> {

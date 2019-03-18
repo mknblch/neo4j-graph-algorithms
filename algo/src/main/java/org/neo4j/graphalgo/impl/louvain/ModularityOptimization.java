@@ -45,6 +45,13 @@ import java.util.function.IntPredicate;
  * with the best (highest) modularity is selected and its community structure
  * is used as result
  *
+ * hugification:
+ *  - Atomic Long : shared node counter
+ *  - long array / map : for community mapping;
+ *  - long array / map with shuffle function: for nodeId list in shared iterator
+ *  - double array / map : helper vars (ki, sTot, sIn)
+ *
+ *
  * @author mknblch
  */
 public class ModularityOptimization extends Algorithm<ModularityOptimization> {

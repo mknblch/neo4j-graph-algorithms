@@ -36,6 +36,11 @@ import org.neo4j.graphalgo.results.AbstractResultBuilder;
  * <p>
  * After calculating the MST the algorithm cuts the tree at its k weakest
  * relationships to form k spanning trees
+ *
+ * ---
+ * hugification:
+ * - based on Prim's algo which first must become capable of handling huge graphs
+ *
  * @author mknblch
  */
 public class KSpanningTree extends Algorithm<KSpanningTree> {
