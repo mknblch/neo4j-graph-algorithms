@@ -19,6 +19,7 @@
 package org.neo4j.graphalgo;
 
 import org.neo4j.graphalgo.api.Graph;
+import org.neo4j.graphalgo.api.HugeGraph;
 import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.ProcedureConfiguration;
 import org.neo4j.graphalgo.core.utils.Pools;
@@ -28,6 +29,7 @@ import org.neo4j.graphalgo.core.utils.TerminationFlag;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.core.write.Exporter;
 import org.neo4j.graphalgo.impl.DangalchevClosenessCentrality;
+import org.neo4j.graphalgo.impl.HugeDangalchevClosenessCentrality;
 import org.neo4j.graphalgo.results.CentralityProcResult;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
@@ -79,14 +81,24 @@ public class DangalchevCentralityProc {
             return Stream.empty();
         }
 
-        final DangalchevClosenessCentrality algo = new DangalchevClosenessCentrality(graph, configuration.getConcurrency(), Pools.DEFAULT)
-                .withProgressLogger(ProgressLogger.wrap(log, "DangalchevCentrality"))
-                .withTerminationFlag(TerminationFlag.wrap(transaction))
-                .compute();
+        final Stream<DangalchevClosenessCentrality.Result> resultStream;
+        if (graph instanceof HugeGraph) {
+            resultStream = new HugeDangalchevClosenessCentrality((HugeGraph) graph, configuration.getConcurrency(), Pools.DEFAULT, tracker)
+                    .withProgressLogger(ProgressLogger.wrap(log, "HugeDangalchevCentrality"))
+                    .withTerminationFlag(TerminationFlag.wrap(transaction))
+                    .compute()
+                    .resultStream();
+        } else {
+            resultStream = new DangalchevClosenessCentrality(graph, configuration.getConcurrency(), Pools.DEFAULT)
+                    .withProgressLogger(ProgressLogger.wrap(log, "DangalchevCentrality"))
+                    .withTerminationFlag(TerminationFlag.wrap(transaction))
+                    .compute()
+                    .resultStream();
+        }
 
         graph.release();
 
-        return algo.resultStream();
+        return resultStream;
     }
 
     @Procedure(value = "algo.closeness.dangalchev", mode = Mode.WRITE)
@@ -125,23 +137,47 @@ public class DangalchevCentralityProc {
             return Stream.of(builder.build());
         }
 
-        final DangalchevClosenessCentrality algo = new DangalchevClosenessCentrality(graph, concurrency, Pools.DEFAULT)
-                .withProgressLogger(ProgressLogger.wrap(log, "DangalchevCentrality"))
-                .withTerminationFlag(TerminationFlag.wrap(transaction));
+        if (graph instanceof HugeGraph) {
 
-        builder.timeEval(algo::compute);
+            final HugeDangalchevClosenessCentrality algo = new HugeDangalchevClosenessCentrality((HugeGraph) graph, concurrency, Pools.DEFAULT, tracker)
+                    .withProgressLogger(ProgressLogger.wrap(log, "DangalchevCentrality"))
+                    .withTerminationFlag(TerminationFlag.wrap(transaction));
 
-        if (configuration.isWriteFlag()) {
-            graph.release();
-            final String writeProperty = configuration.getWriteProperty(DEFAULT_TARGET_PROPERTY);
-            builder.timeWrite(() -> {
-                Exporter exporter = Exporter.of(api, graph)
-                        .withLog(log)
-                        .parallel(Pools.DEFAULT, concurrency, terminationFlag)
-                        .build();
-                algo.export(writeProperty, exporter);
-            });
-            algo.release();
+            builder.timeEval(algo::compute);
+
+            if (configuration.isWriteFlag()) {
+                graph.release();
+                final String writeProperty = configuration.getWriteProperty(DEFAULT_TARGET_PROPERTY);
+                builder.timeWrite(() -> {
+                    Exporter exporter = Exporter.of(api, graph)
+                            .withLog(log)
+                            .parallel(Pools.DEFAULT, concurrency, terminationFlag)
+                            .build();
+                    algo.export(writeProperty, exporter);
+                });
+                algo.release();
+            }
+
+        } else {
+
+            final DangalchevClosenessCentrality algo = new DangalchevClosenessCentrality(graph, concurrency, Pools.DEFAULT)
+                    .withProgressLogger(ProgressLogger.wrap(log, "DangalchevCentrality"))
+                    .withTerminationFlag(TerminationFlag.wrap(transaction));
+
+            builder.timeEval(algo::compute);
+
+            if (configuration.isWriteFlag()) {
+                graph.release();
+                final String writeProperty = configuration.getWriteProperty(DEFAULT_TARGET_PROPERTY);
+                builder.timeWrite(() -> {
+                    Exporter exporter = Exporter.of(api, graph)
+                            .withLog(log)
+                            .parallel(Pools.DEFAULT, concurrency, terminationFlag)
+                            .build();
+                    algo.export(writeProperty, exporter);
+                });
+                algo.release();
+            }
         }
 
         return Stream.of(builder.build());
